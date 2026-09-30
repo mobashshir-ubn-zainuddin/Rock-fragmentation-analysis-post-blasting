@@ -1,0 +1,831 @@
+================================================================================
+ MACHINE-LEARNING-BASED ROCK FRAGMENTATION PREDICTION FROM BLAST PARAMETERS
+ Step-wise implementation plan (conference paper, all experiments on Kaggle)
+ Prepared: 2026-09-29
+================================================================================
+
+CONTENTS
+  0.  Project summary and research questions
+  1.  Literature baseline (what we must beat and how they evaluated)
+  2.  Data: sources, what was downloaded, cleaning, provenance
+  3.  Kaggle set-up
+  4.  Phase 1 - Exploratory data analysis (EDA)
+  5.  Phase 2 - Evaluation design (the most important part for reviewers)
+  6.  Phase 3 - Baselines (Kuznetsov / Kuz-Ram, MVR power law)
+  7.  Phase 4 - ML models + hyper-parameter tuning (RF, XGBoost, SVR, ANN, ...)
+  8.  Phase 5 - Model comparison and statistical significance
+  9.  Phase 6 - Interpretability: which blast parameters matter most
+  10. Phase 7 - Uncertainty and practical blast-design tool
+  11. Phase 8 - Robustness / ablation experiments
+  12. Phase 9 - Figures, tables, paper write-up
+  13. Timeline, checklist, risks
+  APPENDIX A - Full Kaggle notebook code (cell by cell)
+  APPENDIX B - References
+
+
+--------------------------------------------------------------------------------
+0. PROJECT SUMMARY AND RESEARCH QUESTIONS
+--------------------------------------------------------------------------------
+Goal: predict the mean fragment size X50 (m) of a bench blast from
+  - blast geometry  : S/B (spacing/burden), H/B (bench height/burden),
+                      B/D (burden/hole diameter), T/B (stemming/burden)
+  - explosive       : Pf (powder factor, kg/m3)
+  - rock properties : XB (in-situ block size, m), E (Young's modulus, GPa)
+and compare RF, XGBoost, SVR, ANN (plus strong extra baselines) against the
+empirical Kuznetsov/Kuz-Ram model and multivariate regression (MVR).
+
+Research questions (write these into the paper introduction):
+  RQ1  Which ML model predicts X50 most accurately, and is the difference
+       statistically significant (not just a lucky 12-blast test split)?
+  RQ2  Do ML models beat the empirical Kuznetsov equation and the MVR
+       power-law of Hudaverdi et al.?
+  RQ3  Which blast parameters have the greatest influence on X50
+       (SHAP, permutation importance, PDP/ALE), and do the learned effects
+       agree with blasting physics (e.g. higher Pf -> finer X50)?
+  RQ4  How well do models generalise to an UNSEEN mine/quarry
+       (leave-one-site-out) - the realistic deployment scenario?
+  RQ5  How much uncertainty is attached to each prediction (intervals)?
+
+Novelty vs. prior work (Kulatilake 2010, Shi 2012, Amoako 2022,
+Gebretsadik 2024, Sci. Rep. 2025/2026):
+  (a) largest public version of this database (110 blasts, 10 sites, incl.
+      the 13 original validation blasts and Miami Mine data),
+  (b) leakage-aware evaluation: duplicate-aware grouped CV + leave-one-site-out
+      (prior papers report a single 12-blast split -> high-variance R2),
+  (c) statistical model comparison (corrected resampled t-test),
+  (d) physics-consistency check of the learned effects + conformal intervals,
+  (e) a fully reproducible public Kaggle notebook.
+
+
+--------------------------------------------------------------------------------
+1. LITERATURE BASELINE (numbers to quote and compare against)
+--------------------------------------------------------------------------------
+ Paper                          Data              Models            Test result
+ ----------------------------   ---------------   ---------------   -------------------------
+ Hudaverdi et al. 2011 (IJNAMG) 97 + 13 valid.    MVR (2 groups)    R2 ~0.82 (valid.)
+ Kulatilake et al. 2010         90 + 12 valid.    BP-ANN (LM), MVR  ANN R2=0.94, MVR 0.82,
+   (Eng. Geol. 114)             (2 E-groups)                        Kuznetsov 0.57
+ Shi et al. 2012 (TNMSC)        same              SVR               "acceptable accuracy"
+ Amoako et al. 2022 (Mining)    90 train/12 test  SVR, deep ANN     ANN r2=0.87 MSE .0031;
+                                                                    SVR r2=0.81 MSE .0044;
+                                                                    Kuznetsov r2=0.58
+ Gebretsadik et al. 2024        219 (1 quarry,    RF, SVR, XGB, ANN RF R2=0.94 (test)
+   (Discover Appl. Sci.)        India; private)
+ Sci. Rep. 2025 (PMC11968957)   105 (Hudaverdi +  deep learning     (data on request)
+                                Dapai mine)
+ Sci. Rep. 2026 (PMC13040069)   91 (Hudaverdi)    stacking ens.     R2=0.928, RMSE=0.039
+
+Important observations to use in the paper:
+  * All studies use (almost) the same Hudaverdi database but report ONE
+    random split of ~12 blasts -> results are not comparable and have huge
+    variance. We fix this with repeated/grouped CV (Phase 2).
+  * The 12-13 "validation" blasts share mines with training blasts, several
+    are near-duplicates (En13 == En4 inputs, Ru7 == Ru1 except T/B) -> the
+    paper split over-estimates generalisation. We quantify this.
+  * Kulatilake trained separate models per E-group; we test both "one global
+    model" and "per-group model".
+
+
+--------------------------------------------------------------------------------
+2. DATA
+--------------------------------------------------------------------------------
+2.1 What was searched
+  - GitHub, Kaggle, Mendeley Data, Zenodo, figshare, open-access papers
+    (MDPI, Springer Discover, Nature Sci. Rep./PMC).
+  - Finding: every public ML study uses the Hudaverdi et al. database. The
+    other datasets (Gebretsadik 219-blast limestone quarry, Dapai mine,
+    Chinese open-pit coal mines) are "available from the corresponding
+    author on request" - no public download.
+
+2.2 Files now in the project folder
+  data/raw/hudaverdi2010_local_90.csv
+      Your Blast_Database_Combined.csv converted to real CSV (the original
+      .csv files are actually Excel .xlsx workbooks!). 90 blasts =
+      Kulatilake 2010 Tables 1-2.
+  data/raw/external/hudaverdi_blast_fragmentation_finaldataset.csv
+      Downloaded from github.com/pranjalkaushik-in/Blast-Design-and-Rock-Properties
+      110 blasts = full Hudaverdi et al. (2011) database: 97 development +
+      13 validation blasts, 10 sites / 5 countries, incl. 7 Miami Mine (USA)
+      blasts. Metadata columns: mine, country, rock type.
+  data/raw/external/hudaverdi_blast_fragmentation_predataset.csv
+      earlier version of the same (97 rows) - not needed.
+  data/raw/external/blast_fragmentation_synthetic_dataset.csv
+      SYNTHETIC (simulated) data imitating Gebretsadik 2024. NOT real.
+      Never use it for claims; at most mention it is excluded.
+  data/processed/blast_master_110.csv   <-- THE FILE TO UPLOAD TO KAGGLE
+      Columns: blast_id, site, mine, country, rock_type, E_group,
+               paper_split (train/validation as in the original papers),
+               S_B, H_B, B_D, T_B, Pf, XB, E, X50, source
+  data/DATA_NOTES.txt  - provenance + corrections log.
+
+2.3 Verification already done
+  - 90 overlapping blasts: local file vs GitHub file compared value by value.
+    Only 2 discrepancies, both resolved against Kulatilake 2010 Table 2:
+      Oz7 Pf  0.53 (GitHub) -> 0.70 (paper)       [corrected]
+      Ad22 E  15.0 (local)  -> 16.9 (paper)       [corrected]
+  - The 12 validation blasts' X50 values match Kulatilake Tables 4-5 exactly.
+  - The XB minimum of 0.02 m in Kulatilake Table 3 only appears in the Miami
+    blasts -> confirms Miami data belong to the original database.
+
+2.4 Still TO DO before submission (Step D0)
+  [ ] Obtain Hudaverdi, Kulatilake & Kuzu (2011) Int. J. Numer. Anal. Meth.
+      Geomech. 35:1318-1333 (doi:10.1002/nag.957) via your university
+      library and spot-check the Miami (Mi1-7), Ad25 and Mr12/Db10 rows.
+  [ ] Email corresponding authors for an INDEPENDENT external test set
+      (strongly increases paper value):
+        - Gebretsadik et al. 2024 (angstg2007@gmail.com) - 219 limestone blasts
+          (NOTE: different target = % fragmentation, different inputs;
+           usable only as a separate case study, not merged)
+        - Sci. Rep. 2025 authors (Dapai mine, X50 with the SAME 7 inputs)
+      Template text: "We are preparing a conference paper on reproducible ML
+      benchmarking of X50 prediction and would be grateful for access to the
+      blast dataset used in <paper>, which will be cited ...".
+  [ ] If an extra same-format dataset arrives, keep it ONLY as an external
+      test set (never tune on it).
+
+2.5 Known data properties (drive the design)
+  - n = 110, 7 inputs, 1 target; 10 sites; target 0.02-0.96 m, right-skewed.
+  - 12 rows have identical inputs to another row but different X50
+    (measurement noise / irreducible error, e.g. En3 vs En5, En8 vs En9).
+  - Strong site clustering: E is constant within a site (E is almost a
+    site ID!). B/D is almost constant per site too -> models can "recognise
+    the mine". Leave-one-site-out testing is therefore essential.
+
+
+--------------------------------------------------------------------------------
+3. KAGGLE SET-UP (do once)
+--------------------------------------------------------------------------------
+ K1. kaggle.com -> Datasets -> New Dataset -> upload
+       data/processed/blast_master_110.csv and data/DATA_NOTES.txt
+     Title "Rock Blast Fragmentation X50 (Hudaverdi database, 110 blasts)",
+     slug e.g. rock-blast-fragmentation-x50. Set Private until the paper is
+     accepted, then Public (cite the original papers in the description).
+ K2. New Notebook -> "Add Input" -> the dataset. Settings: Accelerator = None
+     (CPU is enough; the data are tiny), Internet = ON (for pip installs),
+     Persistence = Files.
+ K3. Kaggle paths: input  /kaggle/input/<slug>/blast_master_110.csv
+                   output /kaggle/working/  (figures/, tables/, models/)
+     The code in Appendix A locates the CSV automatically with rglob.
+ K4. Pre-installed on Kaggle: sklearn, xgboost, lightgbm, catboost, shap,
+     optuna, seaborn, tensorflow/keras, torch. Pin versions: the first cell
+     prints them -> copy into the paper's "Implementation details".
+ K5. Use one notebook per phase (or one long notebook with sections):
+       01_eda.ipynb, 02_benchmark_cv.ipynb, 03_interpretability.ipynb,
+       04_uncertainty_design_tool.ipynb
+     "Save Version -> Save & Run All (Commit)" so every result is tied to a
+     frozen, reproducible version. Download /kaggle/working outputs.
+ K6. Reproducibility: global SEED=42; every CV splitter/model gets
+     random_state; report mean +- std over repetitions (never one run).
+     Run time budget: whole benchmark ~20-60 min on Kaggle CPU.
+
+
+--------------------------------------------------------------------------------
+4. PHASE 1 - EXPLORATORY DATA ANALYSIS  (notebook 01)
+--------------------------------------------------------------------------------
+ 1.1 Descriptive statistics table (min, max, mean, std, skew) per variable ->
+     "Table 1" of the paper (compare with Kulatilake Table 3).
+ 1.2 Counts per site / country / rock type / E-group (Table 2 of paper).
+ 1.3 Histograms + violin plots per variable; X50 histogram raw and log(X50)
+     (motivates log-target option).
+ 1.4 Pearson AND Spearman correlation heatmaps (inputs + X50).
+ 1.5 Scatter of each input vs X50, coloured by site (shows site clustering).
+ 1.6 Multicollinearity: VIF for each input.
+ 1.7 Duplicate / near-duplicate analysis: count identical-input rows,
+     spread of X50 among them -> estimate of irreducible noise
+     (noise floor RMSE). Report it: no model can beat this.
+ 1.8 Outlier check (IQR / Isolation Forest) -> REPORT, do not delete
+     (with n=110 every blast matters; deleting "outliers" is a known
+     reviewer red flag). Sensitivity run without them in Phase 8.
+ 1.9 PCA / t-SNE 2-D plot coloured by site and by E-group
+     (reproduces the Hudaverdi cluster idea).
+
+
+--------------------------------------------------------------------------------
+5. PHASE 2 - EVALUATION DESIGN  (define BEFORE training anything)
+--------------------------------------------------------------------------------
+Three complementary protocols; ALL models are run under ALL three.
+
+ P1  "Paper split" (comparability with literature)
+     train = 97 development blasts, test = 13 original validation blasts.
+     Report R2, RMSE, MAE, MAPE, VAF, a20-index. Also report on the 12
+     blasts that have Kuznetsov values (for Kuz-Ram comparison).
+     Limitation: 13 points -> R2 CI is wide; show bootstrap 95% CI.
+
+ P2  Repeated grouped K-fold CV (main result)
+     10 repeats x 5 folds on all 110 blasts. GROUPS = identical-input
+     clusters (rows with the same 7 inputs always fall in the same fold ->
+     no memorisation leakage). Hyper-parameters tuned INSIDE each training
+     fold (nested CV, inner 5-fold grouped, Optuna). 50 outer folds ->
+     metric distribution -> mean +- std and statistical tests.
+
+ P3  Leave-One-Site-Out (LOSO) CV (generalisation to a new mine)
+     10 folds, each holds out one entire mine/quarry. This is the realistic
+     "new site" scenario and is new in this literature. Expect lower R2 -
+     this is a finding, not a failure. Report per-site RMSE.
+
+ Metrics (compute on original scale, metres):
+     R2, RMSE, MAE, MAPE(%), VAF(%) = (1 - var(y-p)/var(y))*100,
+     a20-index = fraction of predictions within +-20% of measured value,
+     plus pooled out-of-fold predicted-vs-measured plot.
+
+ Leakage rules (write them in the paper):
+     - Scaling, log transforms, feature selection, tuning: fitted on the
+       training fold only (sklearn Pipelines guarantee this).
+     - The test fold is touched exactly once.
+     - No synthetic / augmented data ever enters a test fold.
+
+
+--------------------------------------------------------------------------------
+6. PHASE 3 - BASELINES
+--------------------------------------------------------------------------------
+ B0  Mean predictor (sanity floor; R2 ~ 0).
+ B1  Kuznetsov / Kuz-Ram empirical model.
+     X50 = A (V/Q)^0.8 Q^(1/6) (E_rws/115)^(-19/20). It needs absolute
+     burden, spacing, bench height, charge per hole and rock factor A that
+     are NOT in the ratio database. Therefore:
+       (a) use the published Kuznetsov predictions X50K of Kulatilake 2010
+           Tables 4-5 for the 12 validation blasts (hard-code them; code in
+           Appendix A), compare on those 12 blasts under P1;
+       (b) state clearly in the paper that Kuz-Ram cannot be evaluated
+           under P2/P3 because it needs absolute quantities.
+ B2  MVR power law (Hudaverdi/Kulatilake):
+       ln X50 = ln a + sum_i b_i ln(x_i)   (ordinary least squares)
+     = linear regression on log-inputs and log-target. Fit (i) one global
+     model, (ii) one per E-group like the original papers.
+ B3  Ridge regression on standardised inputs (linear reference).
+
+
+--------------------------------------------------------------------------------
+7. PHASE 4 - ML MODELS AND TUNING (notebook 02)
+--------------------------------------------------------------------------------
+ Models (all as sklearn-compatible estimators inside Pipelines):
+   M1 Random Forest          M5 SVR (RBF kernel, scaled inputs)
+   M2 Extra Trees            M6 Gaussian Process Regression (RBF + noise)
+   M3 XGBoost                M7 ANN (MLP, 1-3 hidden layers)
+   M4 LightGBM / CatBoost    M8 Stacking ensemble (best 3-4 as base,
+                                Ridge meta-learner)
+ Target option: each model with raw X50 AND with log(X50)
+   (TransformedTargetRegressor) -> keep whichever wins in inner CV, or
+   report both as an ablation.
+
+ ANN notes: the classical paper used Levenberg-Marquardt; the closest in
+   sklearn is MLPRegressor(solver='lbfgs'), which works best on tiny data.
+   Optional: a Keras deep MLP (Amoako-style 4 hidden layers) with early
+   stopping, averaged over 10 seeds (report the seed variance - Kulatilake
+   showed ANN results change from run to run).
+
+ Hyper-parameter search spaces (Optuna TPE, 40-60 trials per inner loop,
+ objective = inner grouped-CV RMSE):
+   RF / ET : n_estimators 200-1000, max_depth 2-12|None,
+             min_samples_leaf 1-8, max_features 0.3-1.0
+   XGBoost : n_estimators 100-1000, learning_rate 0.01-0.3 (log),
+             max_depth 2-6, min_child_weight 1-10, subsample 0.5-1,
+             colsample_bytree 0.5-1, reg_lambda 1e-3-10 (log), reg_alpha 1e-3-10
+   LightGBM: num_leaves 4-31, min_child_samples 3-20, others like XGB
+             (small data -> must allow small min_child_samples)
+   CatBoost: depth 2-6, learning_rate 0.01-0.3, l2_leaf_reg 1-10, iters 300-1500
+   SVR     : C 0.1-1000 (log), epsilon 1e-3-0.1 (log), gamma 1e-3-10 (log)
+   GPR     : kernel = C*RBF(ARD length scales)+WhiteKernel, optimiser restarts 5
+   MLP     : layers (8..64) x 1-3, alpha 1e-5-1 (log), activation relu|tanh,
+             solver lbfgs|adam, max_iter 5000
+ Save best params per outer fold (tables/best_params.json) - report the
+ most frequent / median configuration in the paper.
+
+
+--------------------------------------------------------------------------------
+8. PHASE 5 - COMPARISON AND STATISTICS
+--------------------------------------------------------------------------------
+ 5.1 Main results table: model x protocol (P1, P2, P3) with mean +- std of
+     R2, RMSE, MAE, MAPE, VAF, a20.
+ 5.2 Box plots of the 50 fold-RMSEs per model (P2).
+ 5.3 Significance: Nadeau-Bengio corrected resampled t-test between the best
+     model and every other model (P2 folds); Holm correction for multiple
+     comparisons. Also Friedman test + Nemenyi critical-difference diagram
+     across all models.
+ 5.4 Bootstrap 95% CI of R2 on the 13-blast paper split (P1).
+ 5.5 Predicted-vs-measured plots (+-20% band) for best 3 models + MVR +
+     Kuznetsov; residual histograms; residual vs each input.
+ 5.6 Global vs per-E-group models (Kulatilake-style) comparison.
+ 5.7 Taylor diagram (optional, looks good at conferences).
+
+
+--------------------------------------------------------------------------------
+9. PHASE 6 - INTERPRETABILITY: WHICH PARAMETERS MATTER? (notebook 03)
+--------------------------------------------------------------------------------
+ 6.1 Permutation importance (on out-of-fold test data, 30 repeats).
+ 6.2 SHAP: TreeExplainer for RF/XGB/LGBM; KernelExplainer for SVR/MLP/GPR.
+     Figures: beeswarm summary, bar of mean|SHAP|, dependence plots for
+     Pf, XB, E, T/B, H/B.
+ 6.3 PDP + ICE and ALE plots (ALE is preferred because inputs are
+     correlated/site-clustered).
+ 6.4 Agreement across models: rank-correlation (Kendall tau) of importance
+     rankings of RF, XGB, SVR, ANN, MVR coefficients -> "consensus ranking".
+ 6.5 Physics consistency check - expected directions from blasting theory:
+       Pf  up -> X50 down     T/B up -> X50 up (less energy confinement)
+       XB  up -> X50 up       B/D up -> X50 up (larger burden per hole)
+       E   effect site-dependent (MVR coefficients negative in Kulatilake)
+     Report whether each model's ALE/SHAP trend agrees; flag
+     non-physical behaviour (a strong paper point).
+ 6.6 Caveat paragraph: importance of E and B/D partly reflects "site
+     identity" (confounding) - compare importances under LOSO models.
+
+
+--------------------------------------------------------------------------------
+10. PHASE 7 - UNCERTAINTY AND PRACTICAL TOOL (notebook 04)
+--------------------------------------------------------------------------------
+ 7.1 Prediction intervals: CV+ / split-conformal intervals (90%) from
+     out-of-fold residuals; report empirical coverage under P2 and P3.
+     GPR gives native predictive std - compare.
+ 7.2 Applicability domain: flag inputs outside the training range
+     (min-max box + Mahalanobis distance) - predictions there are
+     extrapolation.
+ 7.3 Design tool demo: for a given site (E, XB) and geometry, sweep Pf and
+     T/B, plot predicted X50 +- interval; inverse design: smallest Pf that
+     gives X50 <= target (e.g. crusher gape constraint). 1 figure in paper.
+ 7.4 Save final model (joblib) trained on all 110 blasts with median best
+     params; provide a predict() function in the notebook.
+
+
+--------------------------------------------------------------------------------
+11. PHASE 8 - ROBUSTNESS / ABLATIONS
+--------------------------------------------------------------------------------
+ A1 Feature subsets: geometry only (S/B,H/B,B/D,T/B) | + Pf | + rock (XB,E)
+    -> quantifies value of rock properties (key message for practitioners).
+ A2 Drop E (site proxy) and/or B/D -> effect under P2 vs P3.
+ A3 Raw vs log target.
+ A4 With vs without the 7 Miami blasts (to compare with 102-blast papers).
+ A5 With vs without IsolationForest "outliers".
+ A6 Training-set size learning curve (20%..100% of training folds).
+ A7 (Optional) data augmentation (Gaussian noise / SMOGN / CTGAN) applied
+    ONLY to training folds; report whether it helps on real test folds.
+ A8 Seed stability: ANN and tree models over 10 seeds.
+
+
+--------------------------------------------------------------------------------
+12. PHASE 9 - FIGURES, TABLES, PAPER
+--------------------------------------------------------------------------------
+ Figures (300 dpi PNG + PDF, saved to /kaggle/working/figures):
+   F1 Blast geometry schematic (redraw Fig. 1 of Kulatilake with labels)
+   F2 Workflow diagram (data -> protocols -> models -> XAI -> tool)
+   F3 Correlation heatmap   F4 X50 by site (box plot)
+   F5 CV RMSE box plots (P2) + LOSO bars (P3)
+   F6 Predicted vs measured (best models, MVR, Kuznetsov)
+   F7 SHAP beeswarm (best model)   F8 ALE curves for Pf, XB, T/B
+   F9 Design-tool curve with prediction intervals
+ Tables: T1 descriptive stats; T2 sites; T3 hyper-parameter spaces;
+   T4 main results P1/P2/P3; T5 significance tests; T6 ablations;
+   T7 comparison with published results.
+ Paper outline (conference, 6-8 pages):
+   1 Introduction (mine-to-mill, Kuz-Ram limits, ML gap, contributions)
+   2 Related work (Section 1 table)
+   3 Data (Section 2)            4 Methods (Sections 5-7)
+   5 Results (Sections 8-10)     6 Discussion (physics, site effect, limits)
+   7 Conclusions and future work (field data, image-based X50, full PSD)
+   Data & code availability: Kaggle notebook + dataset link.
+ Ethics/credit: cite Hudaverdi 2011, Kulatilake 2010 and the GitHub
+   transcription; state the corrections made (DATA_NOTES.txt).
+
+
+--------------------------------------------------------------------------------
+13. TIMELINE, CHECKLIST, RISKS
+--------------------------------------------------------------------------------
+ Week 1 : D0 data verification, Kaggle dataset, EDA (Phase 1), emails
+ Week 2 : Evaluation code, baselines, all models under P1/P2/P3 (Ph. 2-4)
+ Week 3 : Statistics, interpretability, uncertainty, ablations (Ph. 5-8)
+ Week 4 : Figures, writing, internal review, submission
+ Checklist before submission:
+   [ ] every number in the paper produced by a committed Kaggle version
+   [ ] no tuning on test folds; pipelines everywhere
+   [ ] mean +- std reported, significance tested
+   [ ] physics-consistency discussed; limitations stated
+ Risks & mitigations:
+   - Tiny data -> high variance: repeated CV, CIs, simple models included.
+   - Site confounding -> LOSO protocol, ablation A2.
+   - Transcription errors in public data -> D0 spot check, DATA_NOTES.
+   - Reviewer asks "why not more data?" -> external-data emails; state
+     that all public X50 databases were collected (Section 2.1).
+
+
+================================================================================
+APPENDIX A - KAGGLE NOTEBOOK CODE (copy cell by cell)
+================================================================================
+# ---------------------------------------------------------------- CELL 1 ----
+# Setup. Kaggle already has sklearn/xgboost/lightgbm/catboost/shap/optuna.
+# !pip install -q optuna shap            # only if missing (Internet ON)
+import os, json, time, random, warnings
+from pathlib import Path
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import sklearn, scipy
+from scipy import stats
+warnings.filterwarnings("ignore")
+
+SEED = 42
+random.seed(SEED); np.random.seed(SEED)
+
+IN_ROOT = Path("/kaggle/input") if Path("/kaggle/input").exists() else Path("data/processed")
+CSV = next(IN_ROOT.rglob("blast_master_110.csv"))
+OUT = Path("/kaggle/working") if Path("/kaggle/working").exists() else Path("outputs")
+for sub in ["figures", "tables", "models"]:
+    (OUT / sub).mkdir(parents=True, exist_ok=True)
+
+df = pd.read_csv(CSV)
+FEATURES = ["S_B", "H_B", "B_D", "T_B", "Pf", "XB", "E"]
+TARGET = "X50"
+X, y = df[FEATURES].values, df[TARGET].values
+SITE = df["site"].values
+print(CSV, df.shape)
+for m in ["sklearn", "xgboost", "lightgbm", "catboost", "shap", "optuna"]:
+    try: print(m, __import__(m).__version__)
+    except ImportError: print(m, "not installed")
+
+# ---------------------------------------------------------------- CELL 2 ----
+# EDA (Phase 1)
+desc = df[FEATURES + [TARGET]].describe().T
+desc["skew"] = df[FEATURES + [TARGET]].skew()
+desc.round(3).to_csv(OUT / "tables/T1_descriptive.csv"); display(desc.round(3))
+display(df.groupby(["site", "country", "rock_type"]).size().rename("n"))
+
+fig, ax = plt.subplots(1, 2, figsize=(13, 5))
+sns.heatmap(df[FEATURES + [TARGET]].corr("pearson"), annot=True, fmt=".2f",
+            cmap="RdBu_r", vmin=-1, vmax=1, ax=ax[0]); ax[0].set_title("Pearson")
+sns.heatmap(df[FEATURES + [TARGET]].corr("spearman"), annot=True, fmt=".2f",
+            cmap="RdBu_r", vmin=-1, vmax=1, ax=ax[1]); ax[1].set_title("Spearman")
+plt.tight_layout(); plt.savefig(OUT / "figures/F3_correlation.png", dpi=300); plt.show()
+
+fig, axes = plt.subplots(2, 4, figsize=(18, 8))
+for a, f in zip(axes.ravel(), FEATURES):
+    sns.scatterplot(data=df, x=f, y=TARGET, hue="site", ax=a, legend=False, s=35)
+sns.boxplot(data=df, x="site", y=TARGET, ax=axes.ravel()[-1]); axes.ravel()[-1].tick_params(axis="x", rotation=90)
+plt.tight_layout(); plt.savefig(OUT / "figures/F4_scatter_by_site.png", dpi=300); plt.show()
+
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+Xs = (df[FEATURES] - df[FEATURES].mean()) / df[FEATURES].std()
+print("VIF:", {f: round(variance_inflation_factor(Xs.values, i), 2) for i, f in enumerate(FEATURES)})
+
+dup = df.groupby(FEATURES)[TARGET].agg(["count", "std"]).query("count > 1")
+print(f"{len(dup)} identical-input clusters; pooled within-cluster std of X50 = "
+      f"{np.sqrt((dup['std']**2).mean()):.3f} m  (irreducible noise floor)")
+
+# ---------------------------------------------------------------- CELL 3 ----
+# Metrics and CV splitters (Phase 2)
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+
+def metrics(y_true, y_pred):
+    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
+    return {"R2": r2_score(y_true, y_pred),
+            "RMSE": mean_squared_error(y_true, y_pred) ** 0.5,
+            "MAE": mean_absolute_error(y_true, y_pred),
+            "MAPE": np.mean(np.abs((y_true - y_pred) / y_true)) * 100,
+            "VAF": (1 - np.var(y_true - y_pred) / np.var(y_true)) * 100,
+            "a20": np.mean(np.abs(y_pred / y_true - 1) <= 0.20)}
+
+# groups = identical-input clusters -> duplicates never split across folds
+DUP_GROUP = df.groupby(FEATURES, sort=False).ngroup().values
+
+def repeated_group_kfold(groups, n_splits=5, n_repeats=10, seed=SEED):
+    """Yields (train_idx, test_idx); each repeat shuffles groups into folds."""
+    rng = np.random.RandomState(seed)
+    uniq = np.unique(groups)
+    for r in range(n_repeats):
+        perm = rng.permutation(uniq)
+        for k, fold_groups in enumerate(np.array_split(perm, n_splits)):
+            test = np.isin(groups, fold_groups)
+            yield r, k, np.where(~test)[0], np.where(test)[0]
+
+def loso_splits(sites):
+    # rep=0 for every fold (one pass over all sites); fold = held-out site name
+    for s in np.unique(sites):
+        test = sites == s
+        yield 0, s, np.where(~test)[0], np.where(test)[0]
+
+def paper_split():
+    test = (df["paper_split"] == "validation").values
+    yield "paper", 0, np.where(~test)[0], np.where(test)[0]
+
+# ---------------------------------------------------------------- CELL 4 ----
+# Models + Optuna search spaces (Phases 3-4)
+import optuna
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.dummy import DummyRegressor
+from sklearn.svm import SVR
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ConstantKernel
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import GroupKFold, cross_val_score
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+from catboost import CatBoostRegressor
+
+def logy(est):  # model on log(X50), predictions back in metres
+    return TransformedTargetRegressor(regressor=est, func=np.log, inverse_func=np.exp)
+
+def build(name, p):
+    if name == "Mean":  return DummyRegressor()
+    if name == "MVR":   return logy(make_pipeline(FunctionTransformer(np.log), LinearRegression()))
+    if name == "Ridge": return make_pipeline(StandardScaler(), Ridge(alpha=p["alpha"]))
+    if name == "RF":    return RandomForestRegressor(random_state=SEED, n_jobs=-1, **p)
+    if name == "ET":    return ExtraTreesRegressor(random_state=SEED, n_jobs=-1, **p)
+    if name == "XGB":   return XGBRegressor(random_state=SEED, n_jobs=4, verbosity=0, **p)
+    if name == "LGBM":  return LGBMRegressor(random_state=SEED, verbose=-1, **p)
+    if name == "CatB":  return CatBoostRegressor(random_seed=SEED, verbose=0, **p)
+    if name == "SVR":   return logy(make_pipeline(StandardScaler(), SVR(**p)))
+    if name == "GPR":
+        k = ConstantKernel() * RBF(length_scale=np.ones(len(FEATURES))) + WhiteKernel()
+        return logy(make_pipeline(StandardScaler(),
+                    GaussianProcessRegressor(kernel=k, normalize_y=True,
+                                             n_restarts_optimizer=5, random_state=SEED)))
+    if name == "ANN":
+        layers = tuple(p[f"n{i}"] for i in range(p["n_layers"]))
+        return logy(make_pipeline(StandardScaler(),
+                    MLPRegressor(hidden_layer_sizes=layers, activation=p["act"], alpha=p["alpha"],
+                                 solver="lbfgs", max_iter=5000, random_state=SEED)))
+    raise ValueError(name)
+
+def space(name, t):
+    if name == "Ridge": return {"alpha": t.suggest_float("alpha", 1e-3, 100, log=True)}
+    if name in ("RF", "ET"):
+        return {"n_estimators": t.suggest_int("n_estimators", 200, 800, step=100),
+                "max_depth": t.suggest_int("max_depth", 2, 12),
+                "min_samples_leaf": t.suggest_int("min_samples_leaf", 1, 8),
+                "max_features": t.suggest_float("max_features", 0.3, 1.0)}
+    if name == "XGB":
+        return {"n_estimators": t.suggest_int("n_estimators", 100, 1000, step=50),
+                "learning_rate": t.suggest_float("learning_rate", 0.01, 0.3, log=True),
+                "max_depth": t.suggest_int("max_depth", 2, 6),
+                "min_child_weight": t.suggest_float("min_child_weight", 1, 10),
+                "subsample": t.suggest_float("subsample", 0.5, 1.0),
+                "colsample_bytree": t.suggest_float("colsample_bytree", 0.5, 1.0),
+                "reg_lambda": t.suggest_float("reg_lambda", 1e-3, 10, log=True),
+                "reg_alpha": t.suggest_float("reg_alpha", 1e-3, 10, log=True)}
+    if name == "LGBM":
+        return {"n_estimators": t.suggest_int("n_estimators", 100, 1000, step=50),
+                "learning_rate": t.suggest_float("learning_rate", 0.01, 0.3, log=True),
+                "num_leaves": t.suggest_int("num_leaves", 4, 31),
+                "min_child_samples": t.suggest_int("min_child_samples", 3, 20),
+                "subsample": t.suggest_float("subsample", 0.5, 1.0), "subsample_freq": 1,
+                "colsample_bytree": t.suggest_float("colsample_bytree", 0.5, 1.0),
+                "reg_lambda": t.suggest_float("reg_lambda", 1e-3, 10, log=True)}
+    if name == "CatB":
+        return {"iterations": t.suggest_int("iterations", 300, 1500, step=100),
+                "depth": t.suggest_int("depth", 2, 6),
+                "learning_rate": t.suggest_float("learning_rate", 0.01, 0.3, log=True),
+                "l2_leaf_reg": t.suggest_float("l2_leaf_reg", 1, 10, log=True)}
+    if name == "SVR":
+        return {"C": t.suggest_float("C", 0.1, 1000, log=True),
+                "epsilon": t.suggest_float("epsilon", 1e-3, 0.3, log=True),
+                "gamma": t.suggest_float("gamma", 1e-3, 10, log=True)}
+    if name == "ANN":
+        n = t.suggest_int("n_layers", 1, 3)
+        p = {"n_layers": n, "act": t.suggest_categorical("act", ["relu", "tanh"]),
+             "alpha": t.suggest_float("alpha", 1e-5, 1.0, log=True)}
+        for i in range(n): p[f"n{i}"] = t.suggest_int(f"n{i}", 4, 64, log=True)
+        return p
+    return {}   # Mean, MVR, GPR: no tuning (GPR tunes its kernel by max. likelihood)
+
+N_TRIALS = 40
+def tune(name, Xtr, ytr, gtr):
+    if name in ("Mean", "MVR", "GPR"): return {}
+    cv = GroupKFold(n_splits=5)
+    def obj(t):
+        est = build(name, space(name, t))
+        return -cross_val_score(est, Xtr, ytr, groups=gtr, cv=cv,
+                                scoring="neg_root_mean_squared_error").mean()
+    st = optuna.create_study(direction="minimize",
+                             sampler=optuna.samplers.TPESampler(seed=SEED))
+    st.optimize(obj, n_trials=N_TRIALS, show_progress_bar=False)
+    p = space(name, optuna.trial.FixedTrial(st.best_params))
+    return p
+
+MODELS = ["Mean", "MVR", "Ridge", "RF", "ET", "XGB", "LGBM", "CatB", "SVR", "GPR", "ANN"]
+
+# ---------------------------------------------------------------- CELL 5 ----
+# Run the benchmark under one protocol (nested tuning inside each outer fold)
+def run_protocol(proto_name, splits, models=MODELS):
+    rows, oof, params = [], [], []
+    for rep, fold, tr, te in splits:
+        for name in models:
+            t0 = time.time()
+            p = tune(name, X[tr], y[tr], DUP_GROUP[tr])
+            est = build(name, p).fit(X[tr], y[tr])
+            pred = est.predict(X[te])
+            m = metrics(y[te], pred) if len(te) > 1 else {}
+            rows.append({"protocol": proto_name, "rep": rep, "fold": fold, "model": name,
+                         "n_test": len(te), "sec": time.time() - t0, **m})
+            oof += [{"protocol": proto_name, "rep": rep, "model": name, "idx": i,
+                     "y": yt, "pred": yp} for i, yt, yp in zip(te, y[te], pred)]
+            params.append({"protocol": proto_name, "rep": rep, "fold": fold,
+                           "model": name, "params": p})
+        print(proto_name, rep, fold, "done")
+    res, oof = pd.DataFrame(rows), pd.DataFrame(oof)
+    res.to_csv(OUT / f"tables/folds_{proto_name}.csv", index=False)
+    oof.to_csv(OUT / f"tables/oof_{proto_name}.csv", index=False)
+    json.dump(params, open(OUT / f"tables/params_{proto_name}.json", "w"), default=str)
+    return res, oof
+
+res_P1, oof_P1 = run_protocol("P1_paper", paper_split())
+res_P2, oof_P2 = run_protocol("P2_rgkf", repeated_group_kfold(DUP_GROUP, 5, 10))
+res_P3, oof_P3 = run_protocol("P3_loso", loso_splits(SITE))
+# Tip: P2 with 11 models x 50 folds x 40 trials takes the longest; start with
+# n_repeats=2 / N_TRIALS=15 to debug, then commit the full run.
+
+# ---------------------------------------------------------------- CELL 6 ----
+# Summary tables (pooled out-of-fold metrics for P3 because single-site folds
+# can have tiny variance -> fold R2 is meaningless there)
+def summarise(res, oof, pooled=False):
+    if pooled:
+        return (oof.groupby(["model", "rep"]).apply(lambda d: pd.Series(metrics(d.y, d.pred)))
+                   .groupby("model").mean().sort_values("RMSE"))
+    agg = res.groupby("model")[["R2", "RMSE", "MAE", "MAPE", "VAF", "a20"]].agg(["mean", "std"])
+    return agg.sort_values(("RMSE", "mean"))
+
+T4 = {"P1": summarise(res_P1, oof_P1), "P2": summarise(res_P2, oof_P2),
+      "P3_pooled": summarise(res_P3, oof_P3, pooled=True)}
+for k, v in T4.items():
+    v.round(4).to_csv(OUT / f"tables/T4_results_{k}.csv"); print(k); display(v.round(3))
+
+# Kuznetsov comparison on the 12 validation blasts (values from Kulatilake 2010
+# Tables 4-5, X50K column). Mi7 has no published Kuznetsov value.
+KUZ = {"En13": .44, "Ru7": .65, "Mg8": .39, "Mg9": .30, "Rc1": .72, "Mr12": .24, "Db10": .08,
+       "Sm8": .35, "Oz8": .20, "Oz9": .23, "Ad23": .11, "Ad24": .13}
+MVR_PUB = {"En13": .39, "Ru7": .51, "Mg8": .40, "Mg9": .24, "Rc1": .52, "Mr12": .16, "Db10": .16,
+           "Sm8": .19, "Oz8": .17, "Oz9": .16, "Ad23": .18, "Ad24": .14}   # X50R column
+ANN_PUB = {"En13": .42, "Ru7": .63, "Mg8": .37, "Mg9": .28, "Rc1": .43, "Mr12": .18, "Db10": .33,
+           "Sm8": .19, "Oz8": .14, "Oz9": .19, "Ad23": .21, "Ad24": .22}   # Kulatilake ANN mean
+k = df[df.blast_id.isin(KUZ)].copy()
+comp = {"Kuznetsov (published)": metrics(k.X50, k.blast_id.map(KUZ)),
+        "MVR Kulatilake (published)": metrics(k.X50, k.blast_id.map(MVR_PUB)),
+        "ANN Kulatilake (published)": metrics(k.X50, k.blast_id.map(ANN_PUB))}
+o = oof_P1.merge(df[["blast_id"]], left_on="idx", right_index=True)
+for mname, d in o[o.blast_id.isin(KUZ)].groupby("model"):
+    comp[f"{mname} (ours)"] = metrics(d.y, d.pred)
+T7 = pd.DataFrame(comp).T.sort_values("RMSE"); T7.round(3).to_csv(OUT / "tables/T7_vs_literature.csv")
+display(T7.round(3))
+
+# ---------------------------------------------------------------- CELL 7 ----
+# Statistics: corrected resampled t-test (Nadeau & Bengio 2003) on P2 folds
+from statsmodels.stats.multitest import multipletests
+def corrected_ttest(a, b, n_train, n_test):
+    d = np.asarray(a) - np.asarray(b); J = len(d)
+    var = np.var(d, ddof=1) * (1 / J + n_test / n_train)
+    t = d.mean() / np.sqrt(var)
+    return t, 2 * stats.t.sf(abs(t), J - 1)
+
+piv = res_P2.pivot_table(index=["rep", "fold"], columns="model", values="RMSE")
+best = piv.mean().idxmin()
+n_te = res_P2.n_test.mean(); n_tr = len(df) - n_te
+tests = [(m, *corrected_ttest(piv[m], piv[best], n_tr, n_te)) for m in piv if m != best]
+T5 = pd.DataFrame(tests, columns=["model", "t", "p"])
+T5["p_holm"] = multipletests(T5.p, method="holm")[1]
+T5.to_csv(OUT / "tables/T5_significance.csv", index=False); print("best:", best); display(T5)
+print("Friedman:", stats.friedmanchisquare(*[piv[m] for m in piv]))
+
+fig, ax = plt.subplots(figsize=(11, 4.5))
+order = piv.mean().sort_values().index
+sns.boxplot(data=piv[order], ax=ax); ax.set_ylabel("RMSE (m), 10x5 grouped CV")
+plt.xticks(rotation=45); plt.tight_layout(); plt.savefig(OUT / "figures/F5_cv_boxplot.png", dpi=300)
+
+# Predicted vs measured (pooled OOF, P2 repeat 0)
+top = list(order[:3]) + ["MVR"]
+fig, axes = plt.subplots(1, len(top), figsize=(4.2 * len(top), 4.2))
+for a, m in zip(axes, top):
+    d = oof_P2[(oof_P2.model == m) & (oof_P2.rep == 0)]
+    a.scatter(d.y, d.pred, s=18); lim = [0, 1.0]
+    a.plot(lim, lim, "k-"); a.plot(lim, [v * 1.2 for v in lim], "k:"); a.plot(lim, [v * .8 for v in lim], "k:")
+    mm = metrics(d.y, d.pred); a.set_title(f"{m}  R2={mm['R2']:.2f}  RMSE={mm['RMSE']:.3f}")
+    a.set_xlabel("Measured X50 (m)"); a.set_ylabel("Predicted X50 (m)")
+plt.tight_layout(); plt.savefig(OUT / "figures/F6_pred_vs_meas.png", dpi=300)
+
+# ---------------------------------------------------------------- CELL 8 ----
+# Interpretability (Phase 6): fit best tree model + SVR + ANN on all data with
+# the median/most-frequent tuned params, then SHAP / permutation / PDP.
+import shap
+from sklearn.inspection import permutation_importance, PartialDependenceDisplay
+XDF = df[FEATURES]
+final = {}
+for name in ["XGB", "RF", "SVR", "ANN"]:
+    final[name] = build(name, tune(name, X, y, DUP_GROUP)).fit(XDF, y)
+
+tree = final["XGB"]
+sv = shap.TreeExplainer(tree)(XDF)
+shap.plots.beeswarm(sv, show=False); plt.tight_layout()
+plt.savefig(OUT / "figures/F7_shap_beeswarm_XGB.png", dpi=300); plt.show()
+for f in ["Pf", "XB", "T_B", "E"]:
+    shap.plots.scatter(sv[:, f], color=sv, show=False)
+    plt.savefig(OUT / f"figures/shap_dep_{f}.png", dpi=300); plt.show()
+
+bg = shap.kmeans(XDF, 20)
+for name in ["SVR", "ANN"]:
+    ke = shap.KernelExplainer(final[name].predict, bg)
+    vals = ke.shap_values(XDF, nsamples=300)
+    shap.summary_plot(vals, XDF, show=False)
+    plt.savefig(OUT / f"figures/shap_beeswarm_{name}.png", dpi=300); plt.show()
+
+imp = {}
+for name, est in final.items():
+    # NB: in-sample here for ranking only; for the paper also compute it on
+    # held-out folds inside run_protocol (same call on X[te], y[te]).
+    r = permutation_importance(est, XDF, y, n_repeats=30, random_state=SEED,
+                               scoring="neg_root_mean_squared_error")
+    imp[name] = pd.Series(r.importances_mean, index=FEATURES)
+imp = pd.DataFrame(imp); imp.to_csv(OUT / "tables/permutation_importance.csv"); display(imp)
+print("Kendall tau between model rankings:\n", imp.rank().corr("kendall").round(2))
+
+fig, ax = plt.subplots(figsize=(14, 7))
+PartialDependenceDisplay.from_estimator(final["XGB"], XDF, FEATURES, kind="both",
+                                        subsample=60, random_state=SEED, ax=ax)
+plt.tight_layout(); plt.savefig(OUT / "figures/F8_pdp_ice_XGB.png", dpi=300)
+# ALE (preferred with correlated inputs):  !pip install -q PyALE
+# from PyALE import ale; ale(X=XDF, model=final["XGB"], feature=["Pf"], grid_size=20)
+
+# Physics-consistency check: sign of average PDP slope.
+# B_D: theory says + (more burden per hole -> coarser) but the MVR exponents in
+# Kulatilake 2010 have mixed signs (+0.027 G1, -0.150 G2) and B/D is nearly
+# constant per site -> a "VIOLATES" here is a site-confounding discussion point.
+expected = {"Pf": -1, "T_B": +1, "XB": +1, "B_D": +1}
+from sklearn.inspection import partial_dependence
+for name, est in final.items():
+    signs = {}
+    for f, e in expected.items():
+        pdp = partial_dependence(est, XDF, [f], grid_resolution=20)
+        slope = np.polyfit(pdp["grid_values"][0], pdp["average"][0], 1)[0]
+        signs[f] = "OK" if np.sign(slope) == e else "VIOLATES"
+    print(name, signs)
+
+# ---------------------------------------------------------------- CELL 9 ----
+# Uncertainty (Phase 7): split-conformal style 90% intervals from OOF residuals
+def conformal_coverage(oof, model, alpha=0.10, n_iter=200):
+    # Split-conformal check on out-of-fold residuals: calibrate the quantile on a
+    # random half of the blasts, measure coverage on the other half, repeat.
+    d = oof[(oof.model == model) & (oof.rep == oof.rep.iloc[0])]
+    r = np.abs(d.y - d.pred).values
+    rng = np.random.RandomState(SEED); cover, width = [], []
+    for _ in range(n_iter):
+        perm = rng.permutation(len(r)); cal, ev = perm[: len(r) // 2], perm[len(r) // 2:]
+        n = len(cal); q = np.quantile(r[cal], min(1, np.ceil((n + 1) * (1 - alpha)) / n))
+        cover.append(np.mean(r[ev] <= q)); width.append(2 * q)
+    return round(np.mean(cover), 3), round(np.mean(width), 3)
+for m in order[:4]:
+    print(m, "P2 coverage/width:", conformal_coverage(oof_P2, m),
+          " LOSO:", conformal_coverage(oof_P3, m))
+
+# Design tool: sweep powder factor for one site, show X50 +- q
+q90 = np.quantile(np.abs(oof_P2.query("model == @best").y - oof_P2.query("model == @best").pred), .9)
+base = df[df.site == "Akdaglar"][FEATURES].median()
+grid = pd.DataFrame([base] * 50); grid["Pf"] = np.linspace(df.Pf.min(), df.Pf.max(), 50)
+pred = final["XGB"].predict(grid[FEATURES])
+plt.figure(figsize=(6, 4)); plt.plot(grid.Pf, pred); plt.fill_between(grid.Pf, pred - q90, pred + q90, alpha=.25)
+plt.xlabel("Powder factor (kg/m3)"); plt.ylabel("Predicted X50 (m)"); plt.title("Akdaglar, median geometry")
+plt.tight_layout(); plt.savefig(OUT / "figures/F9_design_tool.png", dpi=300)
+
+import joblib; joblib.dump(final, OUT / "models/final_models.joblib")
+
+# ---------------------------------------------------------------- CELL 10 ---
+# Ablations (Phase 8) - reuse run_protocol with a different feature list, e.g.
+# FEATURES_BACKUP = FEATURES
+# for name, feats in {"geometry": ["S_B","H_B","B_D","T_B"],
+#                     "geom+Pf": ["S_B","H_B","B_D","T_B","Pf"],
+#                     "all": FEATURES_BACKUP,
+#                     "no_E": [f for f in FEATURES_BACKUP if f != "E"]}.items():
+#     X = df[feats].values
+#     r, _ = run_protocol(f"abl_{name}", repeated_group_kfold(DUP_GROUP, 5, 5), ["MVR","RF","XGB","SVR"])
+# X = df[FEATURES_BACKUP].values   # restore
+# Note: build("GPR") uses len(FEATURES) - keep FEATURES in sync if GPR is ablated.
+
+
+================================================================================
+APPENDIX B - REFERENCES
+================================================================================
+[1] Kulatilake P.H.S.W., Qiong W., Hudaverdi T., Kuzu C. (2010). Mean particle
+    size prediction in rock blast fragmentation using neural networks.
+    Engineering Geology 114, 298-311. doi:10.1016/j.enggeo.2010.05.008
+[2] Hudaverdi T., Kulatilake P.H.S.W., Kuzu C. (2011). Prediction of blast
+    fragmentation using multivariate analysis procedures. Int. J. Numer. Anal.
+    Methods Geomech. 35, 1318-1333. doi:10.1002/nag.957
+[3] Shi X.Z., Zhou J., Wu B.B., Huang D., Wei W. (2012). Support vector machines
+    approach to mean particle size of rock fragmentation due to bench blasting
+    prediction. Trans. Nonferrous Met. Soc. China 22, 432-441.
+[4] Amoako R., Jha A., Zhong S. (2022). Rock fragmentation prediction using an
+    ANN and SVR hybrid approach. Mining 2, 233-247. doi:10.3390/mining2020013
+[5] Gebretsadik A. et al. (2024). Enhancing rock fragmentation assessment in
+    mine blasting through machine learning algorithms. Discover Applied
+    Sciences 6:223. doi:10.1007/s42452-024-05888-0
+[6] An interpretable deep learning model for the accurate prediction of mean
+    fragmentation size in blasting operations. Scientific Reports (2025).
+    https://pmc.ncbi.nlm.nih.gov/articles/PMC11968957/
+[7] An interpretable Convex Stacking with Guarded Calibration ensemble approach
+    for predicting rock fragmentation in mine blasting. Scientific Reports
+    (2026). https://pmc.ncbi.nlm.nih.gov/articles/PMC13040069/
+[8] Kuznetsov V.M. (1973). Soviet Mining Science 9, 144-148;
+    Cunningham C.V.B. (1983, 1987, 2005) Kuz-Ram model.
+[9] Nadeau C., Bengio Y. (2003). Inference for the generalization error.
+    Machine Learning 52, 239-281.  (corrected resampled t-test)
+[10] Lundberg S., Lee S.-I. (2017). A unified approach to interpreting model
+    predictions (SHAP). NeurIPS.
+[11] Dataset transcription: github.com/pranjalkaushik-in/Blast-Design-and-Rock-Properties

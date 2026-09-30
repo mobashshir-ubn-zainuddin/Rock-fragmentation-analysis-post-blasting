@@ -1,0 +1,24 @@
+DATA PROVENANCE AND CORRECTIONS
+===============================
+data/raw/hudaverdi2010_local_90.csv
+  Converted from Blast_Database_Combined.csv (which is actually an .xlsx workbook, not CSV).
+  90 blasts = Kulatilake et al. (2010) Tables 1 & 2 (training sets only).
+
+data/raw/external/hudaverdi_blast_fragmentation_finaldataset.csv
+  Downloaded 2026-09-29 from https://github.com/pranjalkaushik-in/Blast-Design-and-Rock-Properties
+  110 blasts = Hudaverdi, Kulatilake & Kuzu (2011) IJNAMG 35:1318-1333 database:
+  97 model-development + 13 validation blasts (incl. 7 Miami Mine, Arizona blasts not in Kulatilake 2010).
+  Third-party transcription -> MUST be spot-checked against the original IJNAMG tables before publication.
+  Validation rows (En13, Ru7, Mg8, Mg9, Rc1, Mr12, Db10, Sm8, Oz8, Oz9, Ad23, Ad24) were checked:
+  their X50 matches Kulatilake et al. (2010) Tables 4 & 5 exactly.
+
+data/raw/external/blast_fragmentation_synthetic_dataset.csv
+  SYNTHETIC (simulated) data mimicking Gebretsadik et al. (2024). NOT real measurements.
+  Do NOT use for training/evaluation claims in the paper.
+
+data/processed/blast_master_110.csv  (the file to upload to Kaggle)
+  Cross-check local vs external on 90 overlapping blasts: 2 discrepancies, resolved against Kulatilake (2010):
+    Oz7 Pf : external 0.53 -> corrected to 0.70 (Table 2 of Kulatilake 2010)
+    Ad22 E : local 15.0 wrong -> 16.9 kept (Table 2 of Kulatilake 2010; all Akdaglar blasts E = 16.9 GPa)
+  Columns: blast_id, site, mine, country, rock_type, E_group (G1 E>=40 GPa / G2), paper_split
+           (train/validation as in the original paper), S_B, H_B, B_D, T_B, Pf [kg/m3], XB [m], E [GPa], X50 [m], source

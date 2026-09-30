@@ -1,0 +1,98 @@
+blast_id,mine_name,country,rock_type,mine_type,cluster_group,spacing_to_burden_ratio,bench_height_to_burden_ratio,burden_to_hole_diameter_ratio,stemming_to_burden_ratio,powder_factor_kg_m3,insitu_block_size_m,modulus_of_elasticity_gpa,mean_fragment_size_m,mean_fragment_size_cm,powder_factor_group
+En1,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.78,0.48,0.58,60.0,0.37,37.0,Medium
+En2,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.78,0.48,0.58,60.0,0.37,37.0,Medium
+En3,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.78,0.48,1.08,60.0,0.33,33.0,Medium
+En4,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.78,0.48,1.11,60.0,0.42,42.0,Medium
+En5,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.78,0.48,1.08,60.0,0.46,46.0,Medium
+En6,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,1.17,0.27,1.08,60.0,0.37,37.0,Low
+En7,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,1.06,0.33,1.08,60.0,0.64,64.0,Low
+En8,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.91,0.41,1.11,60.0,0.42,42.0,Medium
+En9,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.91,0.41,1.11,60.0,0.26,26.0,Medium
+En10,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,0.99,0.36,1.08,60.0,0.42,42.0,Low
+En11,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,1.06,0.33,1.11,60.0,0.31,31.0,Low
+En12,Enusa Mine,Spain,"Uranium ore (schistose, folded)",Open-pit,Group 1 (high elastic modulus),1.24,1.33,27.27,1.06,0.33,1.11,60.0,0.38,38.0,Low
+Rc1,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.5,26.2,1.08,0.33,0.68,45.0,0.46,46.0,Low
+Rc2,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.5,26.2,1.12,0.3,0.68,45.0,0.48,48.0,Low
+Rc3,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.58,26.2,1.22,0.28,0.68,45.0,0.48,48.0,Low
+Rc4,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.96,26.2,1.3,0.34,1.56,45.0,0.75,75.0,Low
+Rc5,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.75,26.2,1.31,0.29,1.56,45.0,0.96,96.0,Low
+Rc6,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.75,26.2,1.16,0.36,1.56,45.0,0.76,76.0,Low
+Rc7,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.67,26.2,1.22,0.31,1.8,45.0,0.53,53.0,Low
+Rc8,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.83,26.2,1.34,0.3,1.8,45.0,0.56,56.0,Low
+Rc9,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.83,26.2,1.29,0.32,1.8,45.0,0.74,74.0,Low
+Rc10,Reocin Mine,Spain,Zinc ore,Open-pit,Group 1 (high elastic modulus),1.17,1.83,26.2,1.23,0.35,1.8,45.0,0.44,44.0,Low
+Mg1,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.0,2.67,27.27,0.89,0.75,0.83,50.0,0.23,23.0,High
+Mg2,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.0,2.67,27.27,0.89,0.75,0.78,50.0,0.25,25.0,High
+Mg3,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.0,2.4,30.3,0.8,0.61,1.02,50.0,0.27,27.0,High
+Mg4,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.0,2.4,30.3,0.8,0.61,0.75,50.0,0.3,30.0,High
+Mg5,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.1,2.4,30.3,0.8,0.55,1.18,50.0,0.38,38.0,Medium
+Mg6,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.1,2.4,30.3,0.8,0.55,1.24,50.0,0.37,37.0,Medium
+Mg7,Murgul Copper Mine,Turkey,Dacite / altered dacite (copper),Open-pit,Group 1 (high elastic modulus),1.1,2.4,30.3,0.8,0.55,1.33,50.0,0.38,38.0,Medium
+Ru1,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.13,5.0,39.47,1.93,0.31,2.0,45.0,0.64,64.0,Low
+Ru2,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.2,6.0,32.89,3.67,0.3,2.0,45.0,0.54,54.0,Low
+Ru3,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.2,6.0,32.89,3.7,0.3,2.0,45.0,0.51,51.0,Low
+Ru4,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.2,6.0,32.89,4.67,0.22,2.0,45.0,0.64,64.0,Low
+Ru5,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.2,6.0,32.89,3.11,0.35,2.0,45.0,0.54,54.0,Low
+Ru6,Reocin Mine (Underground),Spain,Zinc ore,Underground,Group 1 (high elastic modulus),1.2,6.0,32.89,3.22,0.34,2.0,45.0,0.69,69.0,Low
+Mr1,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.8,0.49,1.67,32.0,0.17,17.0,Medium
+Mr2,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.8,0.51,1.67,32.0,0.17,17.0,Medium
+Mr3,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.8,0.49,1.67,32.0,0.13,13.0,Medium
+Mr4,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.8,0.52,1.67,32.0,0.17,17.0,Medium
+Mr5,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.8,0.42,1.67,32.0,0.13,13.0,Medium
+Mr6,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.4,6.0,32.89,0.8,0.36,1.67,32.0,0.15,15.0,Low
+Mr7,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.2,6.0,32.89,0.6,0.56,1.03,32.0,0.18,18.0,High
+Mr8,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.4,6.0,32.89,0.6,0.3,1.03,32.0,0.19,19.0,Low
+Mr9,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.4,6.0,32.89,0.6,0.35,1.03,32.0,0.16,16.0,Low
+Mr10,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.16,5.0,39.47,0.5,0.39,1.03,32.0,0.17,17.0,Low
+Mr11,Mrica Quarry,Indonesia,Andesite,Quarry,Group 2 (low elastic modulus),1.16,5.0,39.47,0.5,0.32,1.03,32.0,0.21,21.0,Low
+Db1,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.25,3.5,20.0,1.75,0.73,1.0,9.57,0.44,44.0,High
+Db2,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.25,5.1,20.0,1.75,0.7,1.0,9.57,0.76,76.0,High
+Db3,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.38,3.0,20.0,1.75,0.62,1.0,9.57,0.35,35.0,High
+Db4,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.5,5.5,20.0,1.75,0.56,1.0,9.57,0.55,55.0,High
+Db5,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.75,4.75,20.0,1.75,0.39,1.0,9.57,0.35,35.0,Low
+Db6,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.25,4.75,20.0,1.75,0.33,1.0,9.57,0.23,23.0,Low
+Db7,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.25,5.0,20.0,1.75,0.44,1.0,9.57,0.4,40.0,Medium
+Db8,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.2,2.4,25.0,1.4,0.28,0.5,9.57,0.35,35.0,Low
+Db9,Dongri-Buzurg Mine,India,Manganese ore (micaceous/muscovite schist),Open-pit,Group 2 (low elastic modulus),1.4,3.2,25.0,1.4,0.31,0.5,9.57,0.29,29.0,Low
+Mi1,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,2.5,22.22,1.69,0.71,0.17,10.0,0.1,10.0,High
+Mi2,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,1.67,33.33,0.72,0.46,0.1,10.0,0.09,9.0,Medium
+Mi3,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,1.67,33.33,1.25,0.27,0.1,10.0,0.09,9.0,Low
+Mi4,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,1.67,33.33,0.7,0.47,0.1,10.0,0.08,8.0,Medium
+Mi5,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,1.67,33.33,1.28,0.26,0.1,10.0,0.1,10.0,Low
+Mi6,Miami Mine,USA (Arizona),Pinal schist,Quarry,Group 2 (low elastic modulus),1.0,2.5,22.22,1.69,0.71,0.02,10.0,0.02,2.0,High
+Sm1,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,0.5,13.25,0.15,15.0,Medium
+Sm2,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,0.5,13.25,0.19,19.0,Medium
+Sm3,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,0.5,13.25,0.23,23.0,Medium
+Sm4,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,1.5,13.25,0.22,22.0,Medium
+Sm5,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,1.5,13.25,0.24,24.0,Medium
+Sm6,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,1.5,13.25,0.26,26.0,Medium
+Sm7,Soma Basin Coal Mine,Turkey,Coal,Open-pit,Group 2 (low elastic modulus),1.25,2.5,28.57,0.83,0.42,1.5,13.25,0.28,28.0,Medium
+Ad1,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,4.4,28.09,1.2,0.58,0.77,16.9,0.15,15.0,High
+Ad2,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,4.8,28.09,1.2,0.66,0.56,16.9,0.17,17.0,High
+Ad3,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,4.8,28.09,1.2,0.72,0.29,16.9,0.14,14.0,High
+Ad4,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,4.0,28.09,1.6,0.49,0.81,16.9,0.16,16.0,Medium
+Ad5,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.14,6.82,24.72,1.36,0.84,1.43,16.9,0.21,21.0,High
+Ad6,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.14,6.36,24.72,1.36,0.82,1.77,16.9,0.21,21.0,High
+Ad7,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,3.5,22.47,1.25,0.75,1.03,16.9,0.15,15.0,High
+Ad8,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,3.25,22.47,1.25,0.71,0.83,16.9,0.19,19.0,High
+Ad9,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,3.5,22.47,1.25,0.76,1.68,16.9,0.18,18.0,High
+Ad10,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,3.5,22.47,1.25,0.76,1.24,16.9,0.15,15.0,High
+Ad11,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.14,3.18,24.72,1.14,0.69,0.67,16.9,0.14,14.0,High
+Ad12,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.14,3.18,24.72,1.14,0.69,2.01,16.9,0.2,20.0,High
+Ad13,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.12,2.8,28.09,1.0,0.54,0.96,16.9,0.15,15.0,Medium
+Ad14,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.0,2.4,28.09,1.0,0.56,0.83,16.9,0.14,14.0,High
+Ad15,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.1,3.75,21.74,1.0,1.02,1.64,16.9,0.15,15.0,High
+Ad16,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.1,3.5,22.47,1.25,0.86,2.35,16.9,0.15,15.0,High
+Ad17,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,3.75,17.98,1.56,1.24,1.53,16.9,0.19,19.0,High
+Ad18,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.0,4.0,18.42,1.71,1.26,0.73,16.9,0.15,15.0,High
+Ad19,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.0,4.0,18.42,1.71,1.26,1.47,16.9,0.17,17.0,High
+Ad20,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.14,4.0,18.42,1.71,1.1,1.19,16.9,0.19,19.0,High
+Ad21,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.11,4.44,18.95,1.67,1.25,1.71,16.9,0.22,22.0,High
+Ad22,Akdaglar Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.28,3.61,18.95,1.67,0.89,0.56,16.9,0.2,20.0,High
+Oz1,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.0,2.83,33.71,1.0,0.48,0.45,15.0,0.27,27.0,Medium
+Oz2,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,2.4,28.09,1.0,0.53,0.86,15.0,0.14,14.0,Medium
+Oz3,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,2.4,28.09,1.0,0.53,0.44,15.0,0.14,14.0,Medium
+Oz4,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.25,4.5,22.47,1.5,0.76,0.66,15.0,0.2,20.0,High
+Oz5,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.11,3.33,30.34,1.11,0.47,0.47,15.0,0.17,17.0,Medium
+Oz6,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,3.2,28.09,1.2,0.48,1.11,15.0,0.3,30.0,Medium
+Oz7,Ozmert Quarry,Turkey (Istanbul),Sandstone (aggregate),Quarry,Group 2 (low elastic modulus),1.2,2.4,28.09,1.0,0.53,0.88,15.0,0.12,12.0,Medium
