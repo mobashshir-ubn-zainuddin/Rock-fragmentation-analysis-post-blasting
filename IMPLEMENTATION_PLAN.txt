@@ -197,7 +197,7 @@ Important observations to use in the paper:
      (with n=110 every blast matters; deleting "outliers" is a known
      reviewer red flag). Sensitivity run without them in Phase 8.
  1.9 PCA / t-SNE 2-D plot coloured by site and by E-group
-     (reproduces the Hudaverdi cluster idea).
+     (reproduces the Hudaverdi cluster idea). 
 
 
 --------------------------------------------------------------------------------
