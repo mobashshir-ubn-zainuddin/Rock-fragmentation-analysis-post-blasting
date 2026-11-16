@@ -33,7 +33,7 @@ Email: mobo@kgpian.iitkgp.ac.in}
 \maketitle
 
 \begin{abstract}
-Accurate prediction of the mean fragment size ($X_{50}$) from bench blasting is central to mine-to-mill optimisation, because fragmentation governs downstream loading, hauling, crushing and grinding costs. Empirical models such as the Kuznetsov and Kuz--Ram equations are widely used, but they do not capture the strongly non-linear relationship between blast-design ratios, explosive loading and rock-mass properties. This paper presents a leakage-aware machine-learning benchmark for $X_{50}$ prediction using a database of 110 real bench blasts from ten mines and quarries in five countries (Spain, Turkey, Indonesia, India and the USA), compiled from the published work of Hudaverdi, Kulatilake and Kuzu. Seven blast-design, explosive and rock-property ratios (S/B, H/B, B/D, T/B, powder factor, in-situ block size and elastic modulus) are used to predict $X_{50}$ with Random Forest, Extra Trees, XGBoost, LightGBM, CatBoost, Support Vector Regression, Gaussian Process Regression and an Artificial Neural Network, benchmarked against the Kuznetsov equation and a multivariate power-law regression. Prior studies on this database report a single $\sim$12-blast test split. We evaluate every model under three protocols: the original paper split, repeated duplicate-aware grouped $k$-fold cross-validation, and leave-one-site-out cross-validation, with nested hyper-parameter tuning and a corrected resampled $t$-test for statistical significance. Feature importance is quantified with SHAP and permutation methods, the physical consistency of the learned trends is checked, and split-conformal prediction intervals are provided. CatBoost achieves the best mean RMSE of 0.084\,m under the main cross-validation protocol~(P2), and performance degrades substantially when generalising to unseen mines, which exposes a site-identity confound (elastic modulus and burden-to-diameter ratio are nearly constant within a site) that is masked by protocols used in prior work.
+Predicting mean fragment size ($X_{50}$) from bench blasting is key to mine-to-mill optimisation. Fragmentation drives downstream costs. It affects loading, hauling, crushing and grinding. Empirical models like Kuznetsov and Kuz--Ram are used widely. But they miss the strong non-linear link. This link is between blast-design ratios, explosive loading and rock-mass properties. This paper gives a leakage-aware machine-learning benchmark. The target is $X_{50}$ prediction. We use 110 real bench blasts. They come from ten mines and quarries. These are in five countries: Spain, Turkey, Indonesia, India and the USA. The data come from published work. The authors are Hudaverdi, Kulatilake and Kuzu. Seven ratios predict $X_{50}$. They are S/B, H/B, B/D, T/B, powder factor, in-situ block size and elastic modulus. The models are Random Forest, Extra Trees, XGBoost, LightGBM, CatBoost, Support Vector Regression, Gaussian Process Regression and an Artificial Neural Network. The Kuznetsov equation and a multivariate power-law regression are benchmarks. Past studies on this database use a single $\sim$12-blast test split. We test every model under three protocols. These are the original paper split, repeated duplicate-aware grouped $k$-fold CV, and leave-one-site-out CV. We use nested hyper-parameter tuning. We also use a corrected resampled $t$-test for statistical significance. We measure feature importance with SHAP and permutation methods. We check the physical consistency of learned trends. We also give split-conformal prediction intervals. CatBoost has the best mean RMSE of 0.084\,m under the main CV protocol~(P2). Performance drops a lot when we generalise to unseen mines. This shows a site-identity confound. Elastic modulus and burden-to-diameter ratio stay nearly constant within a site. Past protocols mask this confound.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -52,162 +52,29 @@ support vector regression, artificial neural network, Kuz--Ram model, SHAP
 
 
 
-% =============================================================================
-\section{Introduction}
-% =============================================================================
-Rock fragmentation is the size distribution of broken rock produced by a
-blast, and it is the single blasting outcome with the largest downstream
-economic impact: coarse fragmentation increases secondary breakage, reduces
-loader and excavator productivity, and lowers crusher and mill throughput,
-while excessively fine fragmentation wastes explosive energy
-\cite{kulatilake2010}. The ``mine-to-mill'' philosophy explicitly optimises
-blast design to minimise the combined cost of drilling, blasting, loading
-and comminution instead of blasting cost alone.
-
-The most widely used engineering tool for fragmentation prediction is the
-Kuznetsov equation \cite{kuznetsov1973}, later developed into the Kuz--Ram
-model by Cunningham \cite{cunningham1983,cunningham2005}, which combines an
-empirical mean-fragment-size relation with the Rosin--Rammler size
-distribution and a uniformity index. Although easy to parameterise, Kuz--Ram
-relies on a coarse, subjectively assigned rock factor $A$, does not use
-measured rock-mass stiffness, and is known to under-predict the fines
-fraction \cite{gebretsadik2024}. The true relationship between
-blast-design parameters and fragmentation is highly non-linear and involves
-a heterogeneous, anisotropic rock mass. Several authors have therefore
-applied machine learning (ML) to this problem, most influentially the
-multivariate regression (MVR) and back-propagation artificial neural network
-(ANN) study of Kulatilake et al.\ \cite{kulatilake2010} and the underlying
-blast database compiled by Hudaverdi et al.\ \cite{hudaverdi2011}.
-Subsequent studies re-used this database with a hybrid multilayer ANN/SVR
-architecture \cite{amoako2022}, and newer studies applied Random Forest,
-XGBoost and deep ANNs to a separate 219-blast limestone-quarry dataset
-\cite{gebretsadik2024}.
-
-\subsection{Gaps in the existing literature}
-The existing literature has recurring limitations that this paper addresses:
-\begin{enumerate}
-  \item \textbf{Evaluation instability.} Every study on the Hudaverdi
-  database reports results on a single held-out split of only 12--13
-  blasts \cite{kulatilake2010,amoako2022}. With so few test points,
-  the reported $R^2$ has very high variance and is not directly comparable
-  across papers.
-  \item \textbf{Duplicate and near-duplicate leakage.} Several blasts in
-  the database share \emph{identical} input ratios (e.g.\ blasts En3/En5,
-  En8/En9) but different measured $X_{50}$, reflecting natural field
-  variability. If an ordinary random $k$-fold splits such duplicates across
-  train and test folds, a memorising model can appear to generalise while
-  recalling a near-identical training row.
-  \item \textbf{Site confounding.} Rock elastic modulus $E$ and the
-  burden-to-hole-diameter ratio $B/D$ are almost constant within a given
-  mine (Section~\ref{sec:data}), so a model can partly recognise the mine
-  instead of learning blast physics. None of the prior studies test
-  generalisation to a mine absent from training.
-\end{enumerate}
-
-\subsection{Contributions}
-This paper makes the following contributions:
-\begin{itemize}
-  \item We assemble the largest available version of this database (110 real,
-  field-measured blasts, ten sites, five countries; no synthetic or simulated
-  data), cross-checked against originally published tables
-  (Section~\ref{sec:data}).
-  \item We introduce a duplicate-aware, grouped, repeated
-  cross-validation protocol and a leave-one-site-out protocol alongside the
-  conventional paper-split protocol, and report a statistical significance
-  test (corrected resampled $t$-test \cite{nadeau2003}) between models;
-  this test is absent from all prior work on this problem.
-  \item We benchmark eight ML regressors against the Kuznetsov equation and
-  MVR with nested hyper-parameter tuning, and quantify feature importance
-  with SHAP \cite{lundberg2017}, permutation importance and partial
-  dependence, checking learned trends against blasting-physics expectations.
-  \item We provide split-conformal prediction intervals and a simple
-  powder-factor design tool, with fully reproducible Kaggle notebooks.
-\end{itemize}
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 % =============================================================================
 \section{Introduction}
 % =============================================================================
-Rock fragmentation is the size distribution of broken rock produced by a
-blast, and it is the single blasting outcome with the largest downstream
-economic impact: coarse fragmentation increases secondary breakage, reduces
-loader and excavator productivity, and lowers crusher and mill throughput,
-while excessively fine fragmentation wastes explosive energy
-\cite{kulatilake2010}. The ``mine-to-mill'' philosophy explicitly optimises
-blast design to minimise the combined cost of drilling, blasting, loading
-and comminution instead of blasting cost alone.
+Rock fragmentation is the size distribution of broken rock after a blast. It has the biggest downstream economic impact of all blasting outcomes. Coarse fragmentation raises secondary breakage. It also cuts loader and excavator productivity. And it lowers crusher and mill throughput. Too much fine material wastes explosive energy \cite{kulatilake2010}. The ``mine-to-mill'' idea optimises blast design to cut the combined cost of drilling, blasting, loading and comminution. Blasting cost alone is not the target.
 
-The most widely used engineering tool for fragmentation prediction is the
-Kuznetsov equation \cite{kuznetsov1973}, later developed into the Kuz--Ram
-model by Cunningham \cite{cunningham1983,cunningham2005}, which combines an
-empirical mean-fragment-size relation with the Rosin--Rammler size
-distribution and a uniformity index. Although easy to parameterise, Kuz--Ram
-relies on a coarse, subjectively assigned rock factor $A$, does not use
-measured rock-mass stiffness, and is known to under-predict the fines
-fraction \cite{gebretsadik2024}. The true relationship between
-blast-design parameters and fragmentation is highly non-linear and involves
-a heterogeneous, anisotropic rock mass. Several authors have therefore
-applied machine learning (ML) to this problem, most influentially the
-multivariate regression (MVR) and back-propagation artificial neural network
-(ANN) study of Kulatilake et al.\ \cite{kulatilake2010} and the underlying
-blast database compiled by Hudaverdi et al.\ \cite{hudaverdi2011}.
-Subsequent studies re-used this database with a hybrid multilayer ANN/SVR
-architecture \cite{amoako2022}, and newer studies applied Random Forest,
-XGBoost and deep ANNs to a separate 219-blast limestone-quarry dataset
-\cite{gebretsadik2024}.
+The Kuznetsov equation is the most used tool for fragmentation prediction \cite{kuznetsov1973}. Cunningham later built the Kuz--Ram model on it \cite{cunningham1983,cunningham2005}. The model links mean fragment size to the Rosin--Rammler size distribution. It also adds a uniformity index. Kuz--Ram is easy to set up. But it relies on a coarse rock factor $A$. That value is assigned by hand. The model does not use measured rock-mass stiffness. It is also known to under-predict the fines fraction \cite{gebretsadik2024}. The link between blast-design parameters and fragmentation is highly non-linear. It involves a heterogeneous, anisotropic rock mass. Many authors have therefore used machine learning (ML) for this problem. The most cited work is the multivariate regression (MVR) and back-propagation artificial neural network (ANN) study of Kulatilake et al.\ \cite{kulatilake2010}. That work came with the blast database compiled by Hudaverdi et al.\ \cite{hudaverdi2011}. Later work re-used this database with a hybrid multilayer ANN/SVR design \cite{amoako2022}. Newer work used Random Forest, XGBoost and deep ANNs on a separate 219-blast limestone-quarry set \cite{gebretsadik2024}.
 
 \subsection{Gaps in the existing literature}
-The existing literature has recurring limitations that this paper addresses:
+The literature has several repeated limits. This paper deals with each one:
 \begin{enumerate}
-  \item \textbf{Evaluation instability.} Every study on the Hudaverdi
-  database reports results on a single held-out split of only 12--13
-  blasts \cite{kulatilake2010,amoako2022}. With so few test points,
-  the reported $R^2$ has very high variance and is not directly comparable
-  across papers.
-  \item \textbf{Duplicate and near-duplicate leakage.} Several blasts in
-  the database share \emph{identical} input ratios (e.g.\ blasts En3/En5,
-  En8/En9) but different measured $X_{50}$, reflecting natural field
-  variability. If an ordinary random $k$-fold splits such duplicates across
-  train and test folds, a memorising model can appear to generalise while
-  recalling a near-identical training row.
-  \item \textbf{Site confounding.} Rock elastic modulus $E$ and the
-  burden-to-hole-diameter ratio $B/D$ are almost constant within a given
-  mine (Section~\ref{sec:data}), so a model can partly recognise the mine
-  instead of learning blast physics. None of the prior studies test
-  generalisation to a mine absent from training.
+  \item \textbf{Evaluation instability.} Every study on the Hudaverdi database uses one held-out split. That split has only 12--13 blasts \cite{kulatilake2010,amoako2022}. With so few test points, the reported $R^2$ has high variance. Results are therefore hard to compare across papers.
+  \item \textbf{Duplicate and near-duplicate leakage.} Some blasts in the database share \emph{identical} input ratios. Examples are blasts En3/En5 and En8/En9. But their measured $X_{50}$ differs. This reflects normal field variability. A plain random $k$-fold can split such pairs across train and test. A memorising model then looks like it generalises. In fact it is just recalling a near-identical row.
+  \item \textbf{Site confounding.} Rock elastic modulus $E$ is nearly constant within a mine. The burden-to-hole-diameter ratio $B/D$ also varies little (Section~\ref{sec:data}). A model can therefore partly learn the mine label. It does not learn blast physics. None of the past studies test generalisation to a mine not in training.
 \end{enumerate}
 
 \subsection{Contributions}
-This paper makes the following contributions:
-\begin{itemize}
-  \item We assemble the largest available version of this database (110 real,
-  field-measured blasts, ten sites, five countries; no synthetic or simulated
-  data), cross-checked against originally published tables
-  (Section~\ref{sec:data}).
-  \item We introduce a duplicate-aware, grouped, repeated
-  cross-validation protocol and a leave-one-site-out protocol alongside the
-  conventional paper-split protocol, and report a statistical significance
-  test (corrected resampled $t$-test \cite{nadeau2003}) between models;
-  this test is absent from all prior work on this problem.
-  \item We benchmark eight ML regressors against the Kuznetsov equation and
-  MVR with nested hyper-parameter tuning, and quantify feature importance
-  with SHAP \cite{lundberg2017}, permutation importance and partial
-  dependence, checking learned trends against blasting-physics expectations.
-  \item We provide split-conformal prediction intervals and a simple
-  powder-factor design tool, with fully reproducible Kaggle notebooks.
-\end{itemize}
+The paper has four contributions. First, we assemble the largest version of this database so far. It has 110 real, field-measured blasts. They come from ten sites in five countries. We use no synthetic or simulated data. All values are checked against the original tables (Section~\ref{sec:data}). Second, we add a duplicate-aware, grouped, repeated CV protocol. We also add a leave-one-site-out protocol. Both sit next to the usual paper-split protocol. We also report a statistical significance test (corrected resampled $t$-test \cite{nadeau2003}). Past work on this problem has not used such a test. Third, we test eight ML models against the Kuznetsov equation and MVR. We tune them with nested hyper-parameter search. We measure feature importance with SHAP \cite{lundberg2017}, permutation importance and partial dependence. We then check the learned trends against blasting physics. Finally, we give split-conformal prediction intervals. We also give a simple powder-factor design tool. The Kaggle notebooks are fully reproducible.
+
+
+
+
 
 
 
@@ -224,10 +91,10 @@ This paper makes the following contributions:
 \label{sec:data}
 % =============================================================================
 \subsection{Provenance}
-The database consists of real, measured bench blasts compiled and published by Hudaverdi, Kulatilake and Kuzu
-\cite{hudaverdi2011,kulatilake2010}. We use no synthetic, simulated or augmented data at any stage. The database was cross-checked value by value against the 90 blasts published in \cite{kulatilake2010}; two discrepancies were found and corrected (blast Oz7 powder factor
-$0.53\!\to\!0.70$~kg/m$^3$; blast Ad22 elastic modulus
-$15.0\!\to\!16.9$~GPa).
+The database is built from real, measured bench blasts. Hudaverdi, Kulatilake and Kuzu compiled it, and they published it
+\cite{hudaverdi2011,kulatilake2010}. We use no synthetic data. We use no simulated data either. And we add no augmented data at any point. We checked the database value by value. The reference was the 90 blasts in \cite{kulatilake2010}. Two errors came up. Both are now fixed. Blast Oz7 powder factor went from
+$0.53$ to $0.70$~kg/m$^3$. Blast Ad22 elastic modulus went from
+$15.0$ to $16.9$~GPa.
 
 \begin{table}[t]
 \centering
@@ -254,13 +121,7 @@ Reocin-UG    & Reocin Mine (Underground)& Spain             & Zinc ore         &
 \end{table}
 
 \subsection{Features and target}
-Seven dimensionless ratios and physical quantities serve as inputs:
-spacing-to-burden ratio $S/B$, bench-height-to-burden ratio $H/B$,
-burden-to-hole-diameter ratio $B/D$, stemming-to-burden ratio $T/B$,
-powder factor $P_f$ (kg/m$^3$), in-situ block size $X_B$ (m), and rock
-elastic modulus $E$ (GPa). The target is the measured mean fragment size
-$X_{50}$ (m) obtained by digital image analysis. Table~\ref{tab:descriptive}
-gives descriptive statistics.
+Seven inputs go into the models. The first is the spacing-to-burden ratio $S/B$. The second is the bench-height-to-burden ratio $H/B$. Next comes the burden-to-hole-diameter ratio $B/D$. Then the stemming-to-burden ratio $T/B$. The fifth is powder factor $P_f$ (kg/m$^3$). The sixth is in-situ block size $X_B$ (m). And the last is rock elastic modulus $E$ (GPa). The target is mean fragment size $X_{50}$ (m). It comes from digital image analysis. Table~\ref{tab:descriptive} gives the stats.
 
 \begin{table}[t]
 \centering
@@ -286,11 +147,9 @@ $X_{50}$ & 0.020 & 0.170 & 0.230 & 0.395 & 0.960 & 0.299 & 0.184 \\
 
 \subsection{Data quality considerations}
 \label{sec:leakage}
-Several blasts share identical values of all seven inputs but differ in
-measured $X_{50}$ (e.g.\ En3 vs.\ En5, Mg5 vs.\ Mg7), reflecting genuine
-field variability. Site clustering also affects the data, since $E$ is
-constant within each mine by construction and $B/D$ varies little within a
-site. Figure~\ref{fig:scatter} illustrates this clustering.
+Some blasts share the same values on all seven inputs. But they differ in
+measured $X_{50}$ (e.g.\ En3 vs.\ En5, Mg5 vs.\ Mg7). This is real field variability. Site clustering also shows up in the data. $E$ is constant inside each mine by design. $B/D$ changes little within a site.
+Figure~\ref{fig:scatter} shows this clustering.
 
 \begin{figure*}[!t]
 \centering
@@ -316,68 +175,37 @@ Inputs $E$ and $B/D$ show strong within-site clustering.}
 
 
 
-
-
 % =============================================================================
 \section{Methodology}
 \label{sec:methods}
 % =============================================================================
 \subsection{Evaluation protocols}
-All models are evaluated under three protocols.
+We test all models under three protocols.
 
-\textbf{P2 (repeated grouped $k$-fold CV, main protocol).} Ten repeats of
-5-fold cross-validation over all 110 blasts. Blasts sharing identical
-inputs (Section~\ref{sec:leakage}) are assigned to a common group id and
-\texttt{GroupKFold} guarantees they are never split across train/test,
-eliminating duplicate-row leakage.
+\textbf{P2 (repeated grouped $k$-fold CV, main protocol).} This is ten repeats of
+5-fold CV. It runs over all 110 blasts. Blasts that share the same inputs get one group id (Section~\ref{sec:leakage}). \texttt{GroupKFold} keeps them out of both train and test. That way, duplicate rows do not leak.
 
-\textbf{P3 (leave-one-site-out, LOSO).} Each of the ten mines is held out
-in turn; this is the realistic deployment scenario of predicting
-fragmentation at a site with no training history.
+\textbf{P3 (leave-one-site-out, LOSO).} We hold out one mine at a time. All ten mines take a turn. This is the real deployment case. You predict fragmentation at a site with no past data.
 
-\textbf{P1 (paper split, reference).} 97 development blasts / 13
-original validation blasts, reproducing the split used in
-\cite{hudaverdi2011,kulatilake2010} for direct comparison with published
-numbers.
+\textbf{P1 (paper split, reference).} 97 development blasts and 13
+validation blasts. This is the split used in
+\cite{hudaverdi2011,kulatilake2010}. It lets us compare with the published numbers.
 
-Hyper-parameters are tuned with Optuna (Tree-structured Parzen Estimator,
-40 trials) on an inner 5-fold grouped cross-validation of the
-training fold only, so the outer test fold is never used for model
-selection. Reported metrics are $R^2$, RMSE, MAE, MAPE, variance accounted
-for (VAF) and the $a_{20}$-index (fraction of predictions within $\pm20\%$
-of the measured value).
+We tune hyper-parameters with Optuna. The sampler is Tree-structured Parzen Estimator, 40 trials. Tuning runs on an inner 5-fold grouped CV. That CV uses the training fold only. So the outer test fold never enters model selection. We report $R^2$, RMSE, MAE, MAPE, variance accounted for (VAF) and the $a_{20}$-index. The $a_{20}$-index is the share of predictions within $\pm20\%$ of the measured value.
 
 \subsection{Baselines}
-\textbf{Kuznetsov / Kuz--Ram.} This model requires absolute burden,
-spacing, bench height and per-hole charge mass, which are not present in
-the ratio-based database; we therefore compare against the Kuznetsov
-predictions published in \cite{kulatilake2010} for the 12 shared
-validation blasts (Section~\ref{sec:results}).
+\textbf{Kuznetsov / Kuz--Ram.} This model needs absolute burden, spacing, bench height and per-hole charge mass. None of these are in our ratio-based database. We therefore compare against the Kuznetsov predictions in \cite{kulatilake2010}. The comparison uses the 12 shared validation blasts (Section~\ref{sec:results}).
 
-\textbf{Multivariate regression (MVR).} Following
-\cite{hudaverdi2011,kulatilake2010}, we fit the power-law form
-$\ln X_{50} = \ln a + \sum_i b_i \ln x_i$ by ordinary least squares.
+\textbf{Multivariate regression (MVR).} We fit the power-law form $\ln X_{50} = \ln a + \sum_i b_i \ln x_i$ by ordinary least squares. This follows \cite{hudaverdi2011,kulatilake2010}.
 
 \subsection{Machine-learning models}
-Random Forest \cite{breiman2001}, Extra Trees, XGBoost
-\cite{chen2016xgboost}, LightGBM, CatBoost, Support Vector Regression
-\cite{cortes1995svr} (RBF kernel), Gaussian Process Regression, and a
-multilayer perceptron ANN (1--3 hidden layers, L-BFGS solver) are compared,
-each optionally fit on $\log X_{50}$ via a target transform. A Ridge
-regression and a mean predictor serve as lower-bound sanity checks.
+We compare eight models. These are Random Forest \cite{breiman2001}, Extra Trees, XGBoost \cite{chen2016xgboost}, LightGBM and CatBoost. They also include Support Vector Regression \cite{cortes1995svr} with an RBF kernel, Gaussian Process Regression, and a multilayer perceptron ANN. The ANN has 1--3 hidden layers and an L-BFGS solver. Any model can be fit on $\log X_{50}$ through a target transform. A Ridge regression and a mean predictor act as lower-bound checks.
 
 \subsection{Statistical testing}
-For the P2 protocol, we compare the best model (lowest mean RMSE) against
-every other model using the corrected resampled $t$-test of Nadeau \&
-Bengio \cite{nadeau2003}, with Holm correction for multiple comparisons.
+For P2, we compare the best model with every other model. The best model is the one with the lowest mean RMSE. We use the corrected resampled $t$-test of Nadeau \& Bengio \cite{nadeau2003}. Holm correction handles multiple comparisons.
 
 \subsection{Interpretability and uncertainty}
-Feature importance is quantified with SHAP TreeExplainer (tree models) and
-KernelExplainer (SVR, ANN) \cite{lundberg2017}, permutation importance, and
-partial dependence / ICE plots. Split-conformal prediction intervals (90\%)
-are computed from out-of-fold residuals.
-
-
+Feature importance comes from SHAP. We use TreeExplainer for tree models. For SVR and ANN, we use KernelExplainer \cite{lundberg2017}. We also use permutation importance and partial dependence / ICE plots. Split-conformal intervals (90\%) are computed from out-of-fold residuals.
 
 
 
@@ -395,12 +223,7 @@ are computed from out-of-fold residuals.
 % =============================================================================
 
 \subsection{Main benchmark}
-Results under the main repeated grouped CV protocol~P2 appear in
-Table~\ref{tab:t4_results_p2}, and results under leave-one-site-out~(P3)
-in Table~\ref{tab:t4_results_p3_pooled}. Under P2, CatBoost achieves the
-best mean RMSE (0.084\,m); under P3, Ridge regression performs best
-(RMSE 0.171\,m), reflecting its lower tendency to overfit site-specific
-patterns.
+Table~\ref{tab:t4_results_p2} shows the results for protocol~P2. That is the main repeated grouped CV. Table~\ref{tab:t4_results_p3_pooled} shows the results for leave-one-site-out~(P3). Under P2, CatBoost has the best mean RMSE (0.084\,m). Under P3, Ridge regression is best (RMSE 0.171\,m). Ridge overfits site patterns less. That likely explains the switch.
 
 \begin{table}[t]
 \centering
@@ -469,9 +292,7 @@ MVR ($\pm20\%$ band shown), pooled out-of-fold predictions, protocol P2.}
 \end{figure*}
 
 \subsection{Comparison with literature}
-Table~\ref{tab:vs_literature} compares our models with the published
-Kuznetsov, MVR and ANN predictions of \cite{kulatilake2010} on the 12
-shared validation blasts.
+Table~\ref{tab:vs_literature} compares our models with published results. The published results come from \cite{kulatilake2010}. They cover Kuznetsov, MVR and ANN predictions. The comparison uses the 12 shared validation blasts.
 
 \begin{table}[t]
 \centering
@@ -502,8 +323,7 @@ Mean (ours)           & 0.000 & 0.146 & 0.124 & 43.50 \\
 \end{table}
 
 \subsection{Statistical significance}
-Table~\ref{tab:significance} reports the corrected resampled $t$-test of
-every model against CatBoost (best under P2).
+Table~\ref{tab:significance} reports the corrected resampled $t$-test. Each model is compared with CatBoost. CatBoost is the best model under P2.
 
 \begin{table}[t]
 \centering
@@ -512,8 +332,6 @@ every model against CatBoost (best under P2).
 \small
 \input{tables/T5_significance.tex}
 \end{table}
-
-
 
 
 
@@ -536,9 +354,7 @@ every model against CatBoost (best under P2).
 \label{fig:shap}
 \end{figure*}
 
-Figure~\ref{fig:shap} shows the SHAP summary for XGBoost, and
-Table~\ref{tab:importance} reports permutation importance for four
-representative models.
+Figure~\ref{fig:shap} shows the SHAP summary for XGBoost. We use it to see which features push the prediction up or down. Table~\ref{tab:importance} reports permutation importance. It covers four models. These are a small but useful set. They let us check the SHAP result against a second method.
 
 \begin{table}[t]
 \centering
@@ -564,11 +380,7 @@ representative models.
 % =============================================================================
 \section{Uncertainty and Practical Tool}
 % =============================================================================
-Table~\ref{tab:conformal} reports the empirical coverage and width of 90\%
-split-conformal prediction intervals. A powder-factor design tool is shown
-in Figure~\ref{fig:tool}: for a fixed site and blast geometry, it plots
-predicted $X_{50}$ (with interval) against powder factor, so a blasting
-engineer can select $P_f$ for a target fragment size.
+Table~\ref{tab:conformal} gives the coverage and width of the 90\% split-conformal intervals. Empirical coverage is what we measure. Width is the interval span in metres. Figure~\ref{fig:tool} shows a design tool. It works for a fixed site and a fixed blast geometry. The tool plots predicted $X_{50}$ against powder factor. Each point carries its 90\% interval. A blasting engineer can then read off the $P_f$ that hits a target fragment size.
 
 \begin{table}[t]
 \centering
@@ -610,15 +422,10 @@ blast geometry) with 90\% conformal interval.}
 
 
 
-
-
-
-
-
 % =============================================================================
 \section{Ablation Studies}
 % =============================================================================
-Table~\ref{tab:ablations} compares models trained on all seven features with models trained on blast-design geometry alone, which isolates the contribution of the rock-property inputs ($X_B$, $E$).
+Table~\ref{tab:ablations} reports the ablation study. We train models on all seven features. We also train them on blast-design geometry alone. The gap between the two sets shows the value of the rock inputs. Those inputs are $X_B$ and $E$. Both drop out in the second set.
 
 \begin{table}[t]
 \centering
@@ -660,27 +467,13 @@ Table~\ref{tab:ablations} compares models trained on all seven features with mod
 % =============================================================================
 \section{Discussion}
 % =============================================================================
-CatBoost achieves the lowest mean RMSE (0.084\,m) under P2, followed
-closely by Random Forest (0.085\,m) and XGBoost (0.093\,m); the
-significance test shows no statistically significant difference between the
-top ensemble methods (all Holm-corrected $p\!>\!0.3$). Performance degrades
-substantially under P3 (best RMSE 0.171\,m vs.\ 0.084\,m under P2), which
-shows that site-identity confounds inflate in-distribution accuracy.
-SHAP analysis ranks elastic modulus $E$ and in-situ block size $X_B$ as
-the most influential features across tree-based models, in line with
-blasting-physics expectations. The ablation study shows that removing
-rock-property features ($E$, $X_B$) degrades accuracy substantially,
-particularly for linear models. Two recommendations follow for blasting
-engineers. Tree-ensemble models trained on multi-site databases can match
-or exceed the ANN of \cite{kulatilake2010} at the 12-blast validation set,
-but their advantage is reduced when tested at an unseen site. Conformal
-intervals are well-calibrated (empirical coverage $\approx 0.91$--$0.92$
-for all models) and can support risk-informed blast design. Limitations
-include the small database size (110 blasts), reliance on ratio-based
-rather than absolute inputs, and the third-party transcription of part of
-the database.
+CatBoost has the lowest mean RMSE under P2 (0.084\,m). Random Forest comes next at 0.085\,m, then XGBoost at 0.093\,m. The significance test finds no real gap between these top models. All Holm-corrected $p\!>\!0.3$. Under P3 the picture changes. The best RMSE there is 0.171\,m. Under P2 it was 0.084\,m. So site-identity confounds lift in-distribution accuracy.
 
+SHAP puts elastic modulus $E$ and in-situ block size $X_B$ at the top for the tree models. That fits what blasting physics would predict. The ablation study backs this up. Drop $E$ and $X_B$ and accuracy falls. The fall is biggest for linear models.
 
+Two points for blasting engineers. First, tree-ensemble models on multi-site data can match or beat the ANN of \cite{kulatilake2010} on the 12-blast set. But the edge shrinks at a site not seen in training. Second, conformal intervals are well calibrated. Empirical coverage is about 0.91--0.92 for all models. They can back risk-informed blast design.
+
+We see three limits. The database is small: 110 blasts. The inputs are ratios, not absolute values. And part of the data is a third-party transcription.
 
 
 
@@ -694,20 +487,9 @@ the database.
 % =============================================================================
 \section{Conclusions}
 % =============================================================================
-This paper presented a leakage-aware machine-learning benchmark for
-bench-blast mean fragment size prediction on a 110-blast, ten-site,
-real-world database, comparing eight ML models against the Kuznetsov
-equation and multivariate regression under three complementary evaluation
-protocols with statistical significance testing. CatBoost achieved the
-best cross-validated accuracy (RMSE 0.084\,m, $R^2$ 0.73 under P2), but
-all ensemble methods are statistically indistinguishable from one another.
-Performance degrades markedly under leave-one-site-out evaluation, which
-exposes a site confound masked by conventional random splits. Future work
-includes obtaining an independent external test set through collaboration
-with other research groups, extending the target from mean fragment size to
-the full size distribution (Rosin--Rammler / Swebrec parameters), and
-incorporating image-based fragmentation measurement to enlarge the
-database at lower cost.
+We gave a leakage-aware machine-learning benchmark. The task was mean fragment size prediction for bench blasts. The database has 110 blasts from ten sites. We compared eight ML models. The baselines were the Kuznetsov equation and multivariate regression. We ran three evaluation protocols. Each came with a statistical significance test. CatBoost had the best cross-validated accuracy under P2. Its RMSE was 0.084\,m. Its $R^2$ was 0.73. But all ensemble methods are hard to tell apart. The differences are not significant. Performance drops under leave-one-site-out. That drop shows a site confound. Usual random splits hide it.
+
+We plan three lines of future work. We will get an independent external test set. This will come through collaboration with other research groups. We will move the target from mean size to the full size distribution. That means the Rosin--Rammler or Swebrec parameters. We will also add image-based fragmentation measurement. That will grow the database at lower cost.
 
 
 
@@ -728,26 +510,34 @@ database at lower cost.
 % =============================================================================
 
 \subsection{Limitations of the present study}
-The benchmark rests on 110 blasts drawn from ten sites. This is comparable to previous studies, where Amoako et al.\ \cite{amoako2022} used 90 training and 12 test blasts and Kulatilake et al.\ \cite{kulatilake2010} employed the same 110-blast corpus, but it remains small by modern ML standards. Small-$n$ settings amplify variance in cross-validated metrics and limit the capacity to learn site-agnostic physics. The seven inputs ($S/B$, $H/B$, $B/D$, $T/B$, $P_f$, $X_B$, $E$) are dimensionless ratios or rock-property scalars instead of absolute blast parameters. Direct substitution into the Kuz--Ram formula
+The benchmark rests on 110 blasts. They come from ten sites. This is close to past work. Amoako et al.\ \cite{amoako2022} used 90 train and 12 test blasts. Kulatilake et al.\ \cite{kulatilake2010} used the same 110-blast set. Still, it is small for modern ML. Small-$n$ data make CV metrics noisy. They also limit what the model can learn about site-free physics.
+
+The seven inputs are $S/B$, $H/B$, $B/D$, $T/B$, $P_f$, $X_B$ and $E$. They are ratios or rock scalars. They are not absolute blast parameters. To plug them into the Kuz--Ram formula
 \begin{equation}
   X_{50} = A\,K^{-0.8}\,Q^{1/6}\!\left(\frac{115}{\mathrm{RWS}}\right)^{19/20}
 \end{equation}
-(where $K$ is the powder factor in kg/m$^3$ and RWS is the relative weight strength of the explosive) requires absolute burden $B$, spacing $S$, and charge mass $Q$, which are not available in the current transcription of the dataset. Elastic modulus $E$ is constant within each mine/quarry and $B/D$ shows limited within-site variation. Consequently, models may partly learn a site identifier instead of generalising blast-physics relationships; the pronounced drop from P2 RMSE 0.084\,m to P3 (LOSO) RMSE 0.171\,m shows this. Only the mean fragment size $X_{50}$ is predicted. The full Rosin--Rammler fragment-size distribution $R(x)=\exp[-(x/x_c)^n]$ (characterised by both the characteristic size $x_c$ and uniformity index $n$) or the Swebrec function provides richer information for downstream crushing and milling optimisation \cite{cunningham2005,amoako2022}. The feed-forward ANN trained with the Levenberg--Marquardt algorithm underperforms ensemble methods (P2 RMSE 0.157\,m vs.\ 0.084\,m for CatBoost), which is consistent with its susceptibility to overfitting on small databases. Deep architectures with regularisation would require substantially larger corpora to outperform gradient-boosted trees.
+you need absolute burden $B$, spacing $S$ and charge mass $Q$. $K$ is powder factor in kg/m$^3$. RWS is the relative weight strength of the explosive. None of $B$, $S$ or $Q$ is in the current data file.
+
+$E$ is fixed inside each mine or quarry. $B/D$ shows little within-site spread. A model can therefore pick up a site label. It does not learn blast physics. The drop from P2 RMSE 0.084\,m to P3 (LOSO) RMSE 0.171\,m shows this.
+
+We predict only the mean fragment size $X_{50}$. The full Rosin--Rammler curve gives more. It is $R(x)=\exp[-(x/x_c)^n]$. It has the characteristic size $x_c$ and the uniformity index $n$. The Swebrec function does the same. Both help crushing and milling downstream \cite{cunningham2005,amoako2022}.
+
+The feed-forward ANN uses the Levenberg--Marquardt solver. It does worse than the ensembles. P2 RMSE is 0.157\,m vs.\ 0.084\,m for CatBoost. This fits its tendency to overfit small data. Deep nets with regularisation would need much more data to beat gradient-boosted trees.
 
 \subsection{Directions for future research}
-The most impactful near-term improvement is enlarging the blast database through inter-institutional collaboration, following the recommendation of Kulatilake et al.\ \cite{kulatilake2010}. Digital image analysis (DIA) methods such as WipFrag and Split-Desktop can automate fragment measurement from post-blast photographs, reducing the cost of data acquisition and enabling databases two to three orders of magnitude larger. Gebretsadik et al.\ \cite{gebretsadik2024} demonstrate that ML models trained on 219 blasts from a single limestone quarry still benefit significantly from richer rock-mass characterisation; a multi-mine database with absolute geometric inputs would enable direct Kuz--Ram comparison.
+The best near-term fix is to grow the blast database. This needs inter-institutional collaboration, as Kulatilake et al.\ \cite{kulatilake2010} suggest. Digital image analysis (DIA) tools like WipFrag and Split-Desktop can read fragment size from post-blast photos. This cuts the cost of data collection. It also allows databases two to three orders of magnitude larger. Gebretsadik et al.\ \cite{gebretsadik2024} show that ML models on 219 blasts from one limestone quarry still gain a lot from better rock-mass data. A multi-mine set with absolute geometry would allow direct Kuz--Ram comparison.
 
-Extending the regression target from $X_{50}$ alone to the pair $(x_c, n)$ of the Rosin--Rammler distribution, or directly to cumulative passing percentages at standardised sieve sizes, would provide the blast-design engineer with actionable information for crusher feed optimisation. Amoako et al.\ \cite{amoako2022} identify this as the primary future direction from their ANN--SVR hybrid work, noting that full distribution prediction requires either multi-output regression or sequential models.
+We can move the target from $X_{50}$ alone to the pair $(x_c, n)$. We can also target cumulative passing percentages at standard sieve sizes. Both would give the blast engineer useful input for crusher feed. Amoako et al.\ \cite{amoako2022} name this as the main next step from their ANN--SVR hybrid. They note that full curve prediction needs multi-output regression or sequential models.
 
-Variational auto-encoders (VAEs) and conditional generative adversarial networks (cGANs) have been proposed as a route to augmenting small geomechanical datasets \cite{amoako2022}. Generating synthetic blast records conditioned on site geology could alleviate the small-$n$ limitation while preserving the inter-variable correlations present in physical blast data.
+Variational auto-encoders (VAEs) and conditional GANs (cGANs) have been used to grow small geomechanical sets \cite{amoako2022}. Synthetic blast rows made under site geology could ease the small-$n$ problem. They would also keep the link between variables seen in real blast data.
 
-Reprocessing or supplementing the existing database to recover absolute values of burden $B$ (m), spacing $S$ (m), hole diameter $D$ (mm), bench height $H$ (m), and charge mass $Q$ (kg) would allow models to be evaluated alongside empirical predictors such as the Kuznetsov equation $X_{50}=A(V/Q)^{0.8}Q^{0.167}$ \cite{kuznetsov1973} and the Kuz--Ram model on a fully unified feature set.
+We could reprocess the current database to get absolute burden $B$ (m), spacing $S$ (m), hole diameter $D$ (mm), bench height $H$ (m) and charge mass $Q$ (kg). That would let models stand next to empirical tools. These are the Kuznetsov equation $X_{50}=A(V/Q)^{0.8}Q^{0.167}$ \cite{kuznetsov1973} and the Kuz--Ram model. All would share one feature set.
 
-Leave-one-site-out evaluation reveals that the site confound is the dominant source of generalisation loss. Pre-training ensemble models on pooled multi-mine data and fine-tuning on a small site-specific calibration set (domain adaptation) could recover accuracy without requiring large per-site datasets, an approach analogous to transfer learning in image classification.
+LOSO shows the site confound is the main source of lost accuracy. Pre-train ensembles on pooled multi-mine data. Then fine-tune on a small site-specific calibration set. This is domain adaptation. It could bring accuracy back without big per-site sets. The idea is close to transfer learning in image tasks.
 
-Physics-informed neural networks (PINNs) that embed the Kuz--Ram scaling law as a soft constraint could reduce data requirements and improve extrapolation to blast designs outside the training distribution. Alternatively, coupling borehole-camera image features (extracted by a CNN) with tabular blast parameters in a multimodal model could capture rock-mass heterogeneity at a finer spatial scale than the scalar $X_B$ and $E$ inputs used here.
+Physics-informed neural networks (PINNs) could embed the Kuz--Ram scaling law as a soft rule. That would cut data needs and help extrapolation to blast designs outside the training range. Another path is a multimodal model. It would join borehole-camera image features (from a CNN) with tabular blast data. This could catch rock-mass structure at a finer scale than the scalar $X_B$ and $E$ inputs used here.
 
-Gebretsadik et al.\ \cite{gebretsadik2024} highlight the potential for deploying trained models as real-time decision-support tools. Integrating the conformal prediction interval presented here into a blast-design interface, so that engineers see the predicted $X_{50}$ together with its 90\% uncertainty band, would allow risk-informed specification of powder factor and burden before each blast. Such a tool could be extended to multi-objective optimisation, jointly minimising fragment size, explosive cost, and blast-induced vibration.
+Gebretsadik et al.\ \cite{gebretsadik2024} point to real-time decision-support use for trained models. We could plug the conformal interval from this paper into a blast-design interface. Engineers would see the predicted $X_{50}$ and its 90\% band. That would allow risk-aware choice of powder factor and burden before each blast. The tool could also go multi-objective. It would jointly cut fragment size, explosive cost and blast-induced vibration.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
