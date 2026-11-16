@@ -1,0 +1,6 @@
+# LaTeX auxiliary and compilation files
+paper/__pycache__/
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/texput.log
