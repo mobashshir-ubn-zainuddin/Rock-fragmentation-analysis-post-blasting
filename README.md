@@ -1,81 +1,106 @@
-# Rock Fragmentation Prediction from Blast Parameters
+# Machine Learning-Based Prediction of Rock Fragmentation from Blast Design Parameters
 
-Conference-paper project: predicting mean blast fragment size (X50) from
-blast-design, explosive and rock-property parameters using ML, benchmarked
-against the Kuznetsov/Kuz-Ram and MVR models. **All experiments run on
-Kaggle. All data are real field measurements — no synthetic data is used
-for training or testing.**
+A leakage-aware ML benchmark for predicting mean blast fragment size (X₅₀) from blast-design, explosive, and rock-property parameters, evaluated against the Kuznetsov / Kuz-Ram empirical models. All experiments use real field measurements — no synthetic training data.
 
-## Layout
+> **Paper:** "Machine Learning-Based Prediction of Rock Fragmentation from Blast Design Parameters: A Leakage-Aware Benchmark on a Multi-Mine Database" — IEEEtran conference format, compiled at `paper/paper.pdf`.
+
+---
+
+## Dataset
+
+- **110 bench blasts** from **10 mines and quarries** across 5 countries (Spain, Turkey, Indonesia, India, USA)
+- Compiled from Hudaverdi et al. (2011) and Kulatilake et al. (2010)
+- **7 input features:** S/B, H/B, B/D, T/B, powder factor (Pf), in-situ block size (X_B), elastic modulus (E)
+- **Target:** mean fragment size X₅₀ (m)
+
+---
+
+## Models Benchmarked
+
+| Type | Models |
+|---|---|
+| Empirical | Kuznetsov equation, Kuz-Ram |
+| Linear | Multivariate Regression (MVR), Ridge |
+| Kernel | Support Vector Regression (SVR), Gaussian Process (GPR) |
+| Ensemble | Random Forest, Extra Trees, XGBoost, LightGBM, CatBoost |
+| Neural | Artificial Neural Network (ANN) |
+
+---
+
+## Evaluation Protocols
+
+| Protocol | Description |
+|---|---|
+| **P1** | Original paper split (90 train / 12 test, single run) |
+| **P2** | Repeated duplicate-aware grouped k-fold CV (10×5 folds) |
+| **P3** | Leave-one-site-out (LOSO) — generalization to unseen mines |
+
+Statistical significance: corrected resampled t-test (Nadeau & Bengio 2003) with Holm correction.
+
+**Key result:** CatBoost achieves best mean RMSE **0.084 m** (R² = 0.73) under P2. Performance degrades to RMSE **0.171 m** under P3, exposing a site-identity confound masked by conventional random splits.
+
+---
+
+## Reproducing the Results
+
+### On Kaggle (recommended)
+
+1. **One-time setup per notebook:**
+   - Create a GitHub fine-grained personal access token scoped to this repo with *Contents: Read and write*.
+   - On Kaggle: *Add-ons → Secrets* → add it as `GITHUB_TOKEN`, attach to each notebook.
+   - Session options → *Internet: on*, Persistence → *Variables and Files*.
+
+2. **Run notebooks in order:**
+   ```
+   01_eda.ipynb
+   02_baselines_and_ml_benchmark.ipynb   (N_TRIALS=40, n_repeats=10)
+   03_interpretability.ipynb
+   04_uncertainty_ablations.ipynb
+   ```
+   Each notebook auto-pulls prior outputs from GitHub at startup and pushes its own results on completion.
+
+3. **Generate paper tables locally:**
+   ```bash
+   git pull   # fetch outputs/ pushed by Kaggle
+   python paper/make_tables.py --outputs outputs
+   ```
+
+### Locally
+
+```bash
+git clone https://github.com/mobashshir-ubn-zainuddin/Rock-fragmentation-analysis-post-blasting
+cd Rock-fragmentation-analysis-post-blasting
+pip install scikit-learn xgboost lightgbm catboost shap dill joblib pandas numpy matplotlib
+jupyter notebook notebooks/01_eda.ipynb
 ```
-data/
-  raw/hudaverdi2010_local_90.csv           90 blasts, from the user's original files
-  raw/external/                             GitHub transcription of the full 110-blast DB
-  processed/blast_master_110.csv            <- upload this to Kaggle as a Dataset
-  DATA_NOTES.txt                            full provenance + 2 corrected values
 
-notebooks/                                  run in order, on Kaggle
-  01_eda.ipynb                              Phase 1: exploratory data analysis
-  02_baselines_and_ml_benchmark.ipynb       Phases 2-5: protocols, baselines, ML, stats
-  03_interpretability.ipynb                 Phase 6: SHAP, permutation importance, PDP
-  04_uncertainty_ablations.ipynb            Phases 7-8: conformal intervals, design tool,
-                                             ablations
+> The full benchmark (P2: 10 repeats × 5 folds × 40 Optuna trials × 10 models) is compute-heavy. Use `N_TRIALS=5, n_repeats=3` for a quick local check.
 
-paper/
-  paper.tex, references.bib                 IEEEtran conference paper (compiles on Overleaf)
-  make_tables.py                            regenerates paper/tables/*.tex from Kaggle CSV
-                                             output — no hand-typed numbers
-  tables/, figures/                         auto-generated LaTeX tables + copied PNGs
+---
 
-outputs_placeholder_debug_run/              fast-debug run used only to verify the
-                                             pipeline runs end to end (NOT final results)
+## Compiling the Paper
 
-IMPLEMENTATION_PLAN.txt                     the original detailed step-by-step plan
+```bash
+cd paper
+pdflatex paper.tex
+bibtex paper
+pdflatex paper.tex
+pdflatex paper.tex
 ```
 
-## Workflow (GitHub-synced — current)
+Requires a LaTeX distribution with IEEEtran, booktabs, siunitx, hyperref, amsmath. Tested with MiKTeX on Windows and TeX Live on Linux.
 
-The repo is [mobashshir-ubn-zainuddin/Rock-fragmentation-analysis-post-blasting](https://github.com/mobashshir-ubn-zainuddin/Rock-fragmentation-analysis-post-blasting),
-already holding `data/`. Each notebook now opens with a **Setup — sync with
-the GitHub repository** cell that clones/pulls this repo into
-`/kaggle/working/repo` and writes every output under `repo/outputs/`, then
-closes with a **Push results to GitHub** cell. This removes the manual
-"create a second Kaggle Dataset" step: Notebook 02 pushes its benchmark
-tables, Notebook 03 pulls them automatically (via `sync_repo()`) and pushes
-its models/SHAP tables, Notebook 04 pulls both and pushes its own results.
+---
 
-One-time setup per Kaggle notebook:
-1. Create a GitHub **fine-grained personal access token** scoped only to
-   this repo, with **Contents: Read and write**.
-2. On Kaggle: *Add-ons → Secrets* → add it as `GITHUB_TOKEN`, and attach
-   that secret to each of the four notebooks.
-3. Session options → **Internet: on**, Persistence → *Variables and Files*
-   (already set — this is what keeps `/kaggle/working/repo` around between
-   runs of the *same* notebook; the GitHub push/pull is what shares results
-   *across* the four different notebooks).
+## Security Note
 
-Then, in order:
-1. Run `notebooks/01_eda.ipynb` (data comes from the attached `blasting`
-   Kaggle Dataset, or straight from the repo if you only attach the repo).
-2. Run `notebooks/02_baselines_and_ml_benchmark.ipynb` at **full settings**
-   (`N_TRIALS=40`, `n_repeats=10` — already the default; the earlier debug
-   run used 3/1 only to verify no errors). It checkpoints a push after each
-   of P1/P2/P3, so an interrupted session doesn't lose completed work.
-3. Run `notebooks/03_interpretability.ipynb`, then
-   `notebooks/04_uncertainty_ablations.ipynb` — both auto-pull the prior
-   notebooks' pushed outputs at the top.
-4. Locally: `git pull` this repo (now containing the real `outputs/` from
-   Kaggle), then `python paper/make_tables.py --outputs outputs` to
-   regenerate `paper/tables/*.tex` from the real results.
-5. Copy the real figures into `paper/figures/`, delete the
-   `\PlaceholderNotice` box in `paper.tex`, fill in the Discussion/
-   Conclusion placeholders, and compile (Overleaf, IEEEtran built in).
+`GITHUB_TOKEN` is read fresh from Kaggle Secrets for every git command and passed only as a one-off `-c http.extraheader=...` argument — never written into `.git/config` or any notebook output file. Keep the token scoped to this repository only.
 
-**Security note:** `GITHUB_TOKEN` is read fresh from Kaggle Secrets for
-every git command and passed only as a one-off `-c http.extraheader=...`,
-never written into `.git/config` or any file under `/kaggle/working` — so
-it cannot leak even if a notebook's output is later made public. Keep the
-token scoped to this one repo only.
+---
 
-See `IMPLEMENTATION_PLAN.txt` for the full research design, literature
-baseline, and evaluation rationale.
+## Citation
+
+If you use this dataset or benchmark, please cite the original database sources:
+
+- T. Hudaverdi, P. H. S. W. Kulatilake, and C. Kuzu, "Prediction of blast fragmentation using multivariate analysis procedures," *Int. J. Numer. Anal. Methods Geomech.*, vol. 35, no. 12, 2011.
+- P. H. S. W. Kulatilake, W. Qiong, T. Hudaverdi, and C. Kuzu, "Mean particle size prediction in rock blast fragmentation using neural networks," *Engineering Geology*, vol. 114, no. 3–4, 2010.
